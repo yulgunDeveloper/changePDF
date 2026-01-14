@@ -2,208 +2,368 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Downloader</title>
-  <meta name="description" content="직접 파일 URL을 다운로드하는 간단한 도구" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PDF 병합/분할</title>
   <style>
-    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    body { margin: 0; background: #f6f7f9; color: #111; }
-    .wrap { max-width: 880px; margin: 0 auto; padding: 20px; }
-    .card {
-      background: #fff; border-radius: 14px; padding: 18px;
-      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+    :root { --bg:#0b1220; --card:#121b2e; --text:#eaf0ff; --muted:#9fb0d0; --accent:#4ea1ff; --line:#24314d; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 28px 16px 60px; }
+    h1 { font-size: 22px; margin: 0 0 14px; }
+    .sub { color:var(--muted); margin: 0 0 20px; line-height: 1.5; }
+    .tabs { display:flex; gap:8px; margin: 18px 0; }
+    .tabbtn { border:1px solid var(--line); background:transparent; color:var(--text); padding:10px 12px; border-radius:10px; cursor:pointer; }
+    .tabbtn.active { background: var(--card); border-color: var(--accent); }
+    .card { background:var(--card); border:1px solid var(--line); border-radius: 14px; padding: 16px; }
+    .row { display:flex; gap:12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+    label { display:block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input[type="file"], input[type="text"], select {
+      background:#0f1830; border:1px solid var(--line); color:var(--text);
+      padding:10px 12px; border-radius:10px; width: min(520px, 100%);
     }
-    h1 { font-size: 20px; margin: 0 0 8px; }
-    p { margin: 6px 0 0; line-height: 1.5; color: #333; }
-    .row { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 14px; }
-    @media (min-width: 720px) { .row { grid-template-columns: 1fr auto; } }
-    input[type="url"]{
-      width: 100%; padding: 12px 12px; font-size: 16px;
-      border: 1px solid #d7dbe2; border-radius: 10px; outline: none;
+    .btn {
+      background: var(--accent); border:none; color:#061020;
+      padding: 10px 14px; border-radius: 10px; cursor:pointer; font-weight: 700;
     }
-    input[type="url"]:focus { border-color: #7aa7ff; box-shadow: 0 0 0 3px rgba(122,167,255,.25); }
-    button{
-      padding: 12px 14px; font-size: 16px; border: 0; border-radius: 10px;
-      background: #1a73e8; color: #fff; cursor: pointer; min-width: 140px;
-    }
-    button:disabled { opacity: .6; cursor: not-allowed; }
-    .meta { margin-top: 12px; font-size: 14px; color: #444; }
-    .meta code { background: #f1f3f6; padding: 2px 6px; border-radius: 6px; }
-    .status { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #f1f3f6; }
-    .status.ok { background: #eaf7ef; color: #0b5; }
-    .status.err { background: #fdecec; color: #b00020; }
-    .small { font-size: 13px; color: #666; margin-top: 10px; }
-    .links { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
-    a.btn {
-      display: inline-block; padding: 10px 12px; border-radius: 10px;
-      background: #111; color: #fff; text-decoration: none; font-size: 14px;
-    }
-    a.btn.secondary { background: #5f6368; }
+    .btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+    .btn:disabled { opacity: .6; cursor:not-allowed; }
+    .hint { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .status { margin-top: 12px; font-size: 13px; color: var(--muted); white-space: pre-wrap; }
+    .hidden { display:none; }
+    .list { margin-top: 10px; padding-left: 18px; color: var(--muted); }
+    .footer { margin-top: 18px; color: var(--muted); font-size: 12px; }
+    a { color: var(--accent); }
+    code { background:#0f1830; padding: 2px 6px; border-radius: 6px; border:1px solid var(--line); }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card">
-      <h1>파일 URL 다운로드</h1>
-      <p>직접 파일 링크(예: <code>.mp4</code>, <code>.mp3</code>, <code>.zip</code>)를 넣으면 PC/모바일에서 다운로드를 시작합니다.</p>
-      <p class="small">참고: YouTube 등 “추출이 필요한 플랫폼 URL”은 지원하지 않습니다.</p>
+    <h1>PDF 병합 / 분할</h1>
+    <p class="sub">
+      서버 업로드 없이 브라우저에서만 처리합니다. (GitHub Pages 호스팅 가능)
+      대용량 PDF는 브라우저 메모리/성능에 따라 시간이 걸릴 수 있습니다.
+    </p>
 
-      <div class="row">
-        <input id="urlInput" type="url" placeholder="https://example.com/video.mp4" autocomplete="off" />
-        <button id="downloadBtn">다운로드</button>
+    <div class="tabs">
+      <button class="tabbtn active" data-tab="merge">병합</button>
+      <button class="tabbtn" data-tab="split">분할</button>
+    </div>
+
+    <!-- MERGE -->
+    <section id="tab-merge" class="card">
+      <h2 style="margin:0 0 10px; font-size: 18px;">PDF 병합</h2>
+
+      <div>
+        <label>PDF 파일 여러 개 선택</label>
+        <input id="mergeFiles" type="file" accept="application/pdf" multiple />
+        <div class="hint" style="margin-top:8px;">
+          선택한 순서대로 병합됩니다. (브라우저에 따라 선택 순서가 유지되지 않을 수 있습니다.)
+          순서가 중요하면, 파일명을 <code>01_</code>, <code>02_</code>처럼 정렬되도록 권장합니다.
+        </div>
       </div>
 
-      <div class="meta" id="meta"></div>
-      <div class="status" id="status" style="display:none;"></div>
-      <div class="links" id="links" style="display:none;"></div>
+      <div class="row">
+        <button id="mergeBtn" class="btn" disabled>병합해서 다운로드</button>
+        <button id="mergeClearBtn" class="btn secondary">초기화</button>
+      </div>
+
+      <div class="status" id="mergeStatus"></div>
+    </section>
+
+    <!-- SPLIT -->
+    <section id="tab-split" class="card hidden" style="margin-top: 14px;">
+      <h2 style="margin:0 0 10px; font-size: 18px;">PDF 분할</h2>
+
+      <div>
+        <label>분할할 PDF 1개 선택</label>
+        <input id="splitFile" type="file" accept="application/pdf" />
+      </div>
+
+      <div class="row" style="align-items:flex-end;">
+        <div>
+          <label>분할 방식</label>
+          <select id="splitMode">
+            <option value="range">선택 페이지(범위/목록)만 추출 → 1개 PDF</option>
+            <option value="each">각 페이지를 개별 PDF로 분할 → ZIP 다운로드</option>
+            <option value="chunks">N페이지 단위로 분할 → ZIP 다운로드</option>
+          </select>
+        </div>
+
+        <div id="rangeBox">
+          <label>페이지 지정 (예: 1-3,5,8-10)</label>
+          <input id="pageSpec" type="text" placeholder="1-3,5,8-10" />
+          <div class="hint" style="margin-top:6px;">페이지는 1부터 시작합니다.</div>
+        </div>
+
+        <div id="chunkBox" class="hidden">
+          <label>묶음 크기(N페이지)</label>
+          <input id="chunkSize" type="text" inputmode="numeric" placeholder="예: 5" />
+          <div class="hint" style="margin-top:6px;">예: 5로 설정하면 1-5, 6-10… 형태로 분할합니다.</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="splitBtn" class="btn" disabled>분할해서 다운로드</button>
+        <button id="splitClearBtn" class="btn secondary">초기화</button>
+      </div>
+
+      <ul class="list">
+        <li>“선택 페이지 추출”은 지정한 페이지만 1개 PDF로 만듭니다.</li>
+        <li>“개별 분할 / N페이지 단위”는 결과가 여러 개이므로 ZIP으로 내려받습니다.</li>
+      </ul>
+
+      <div class="status" id="splitStatus"></div>
+    </section>
+
+    <div class="footer">
+      사용 라이브러리: <code>pdf-lib</code>, <code>JSZip</code>
     </div>
   </div>
 
+  <!-- pdf-lib -->
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <!-- jszip -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
   <script>
-    const $ = (id) => document.getElementById(id);
+    const $ = (sel) => document.querySelector(sel);
 
-    const urlInput = $("urlInput");
-    const downloadBtn = $("downloadBtn");
-    const statusEl = $("status");
-    const metaEl = $("meta");
-    const linksEl = $("links");
+    // Tabs
+    document.querySelectorAll(".tabbtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tabbtn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
 
-    function setStatus(type, msg) {
-      statusEl.style.display = "block";
-      statusEl.className = "status " + (type || "");
-      statusEl.textContent = msg;
-    }
+        const tab = btn.dataset.tab;
+        $("#tab-merge").classList.toggle("hidden", tab !== "merge");
+        $("#tab-split").classList.toggle("hidden", tab !== "split");
+      });
+    });
 
-    function clearStatus() {
-      statusEl.style.display = "none";
-      statusEl.textContent = "";
-      statusEl.className = "status";
-    }
+    // Utilities
+    function setStatus(el, msg) { el.textContent = msg || ""; }
 
-    function showLinks(url) {
-      linksEl.style.display = "flex";
-      linksEl.innerHTML = "";
-
-      // 모바일/PC에서 새 탭 열기(브라우저 기본 다운로드 UI 유도)
-      const open = document.createElement("a");
-      open.className = "btn secondary";
-      open.href = url;
-      open.target = "_blank";
-      open.rel = "noopener noreferrer";
-      open.textContent = "새 탭에서 열기";
-
-      // 일부 브라우저에서 download 힌트(동일 출처나 CORS 허용 시 더 잘 작동)
-      const direct = document.createElement("a");
-      direct.className = "btn";
-      direct.href = url;
-      direct.setAttribute("download", "");
-      direct.textContent = "다운로드 시도";
-
-      linksEl.appendChild(direct);
-      linksEl.appendChild(open);
-    }
-
-    function isBlockedPlatform(host) {
-      // “플랫폼 추출”로 해석될 소지가 큰 도메인은 명시 차단
-      const blocked = [
-        "youtube.com", "www.youtube.com", "youtu.be",
-        "music.youtube.com",
-        "vimeo.com",
-        "tiktok.com",
-        "instagram.com", "www.instagram.com",
-        "x.com", "twitter.com"
-      ];
-      return blocked.includes(host);
-    }
-
-    function guessFilename(u) {
-      try {
-        const url = new URL(u);
-        const p = url.pathname.split("/").filter(Boolean);
-        let last = p[p.length - 1] || "download";
-        // 쿼리로 파일명이 올 때 대비 (filename=)
-        const qName = url.searchParams.get("filename") || url.searchParams.get("file");
-        if (qName) last = qName;
-        return decodeURIComponent(last);
-      } catch {
-        return "download";
-      }
-    }
-
-    async function tryDownloadAsBlob(url) {
-      // CORS가 허용되는 “직접 파일 URL”에 한해 blob 다운로드가 가능
-      const res = await fetch(url, { mode: "cors" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const contentType = res.headers.get("content-type") || "";
-      const contentLen = res.headers.get("content-length") || "";
-      metaEl.innerHTML = `콘텐츠 타입: <code>${contentType || "unknown"}</code>` +
-        (contentLen ? ` · 크기: <code>${contentLen} bytes</code>` : "");
-
-      const blob = await res.blob();
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      const objectUrl = URL.createObjectURL(blob);
-      a.href = objectUrl;
-      a.download = guessFilename(url);
+      a.href = url;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(objectUrl);
+      URL.revokeObjectURL(url);
     }
 
-    async function handleDownload() {
-      clearStatus();
-      metaEl.textContent = "";
-      linksEl.style.display = "none";
-      linksEl.innerHTML = "";
-
-      const raw = urlInput.value.trim();
-      if (!raw) {
-        setStatus("err", "URL을 입력하세요.");
-        return;
-      }
-
-      let url;
-      try {
-        url = new URL(raw);
-      } catch {
-        setStatus("err", "유효한 URL 형식이 아닙니다.");
-        return;
-      }
-
-      if (!["http:", "https:"].includes(url.protocol)) {
-        setStatus("err", "http/https URL만 지원합니다.");
-        return;
-      }
-
-      if (isBlockedPlatform(url.host)) {
-        setStatus("err", "해당 플랫폼 URL은 지원하지 않습니다. 직접 파일 URL(mp4/mp3/zip 등)만 다운로드할 수 있습니다.");
-        showLinks(raw);
-        return;
-      }
-
-      downloadBtn.disabled = true;
-      downloadBtn.textContent = "처리 중...";
-
-      try {
-        // 우선 브라우저에서 blob 다운로드 시도(CORS 허용 시 가장 UX 좋음)
-        await tryDownloadAsBlob(raw);
-        setStatus("ok", "다운로드를 시작했습니다. (브라우저 다운로드 목록을 확인하세요)");
-      } catch (e) {
-        // CORS 차단/리다이렉트 등으로 실패하면 링크 제공 방식으로 폴백
-        setStatus("err",
-          "브라우저 보안 정책(CORS) 때문에 직접 다운로드에 실패했습니다. 아래 버튼으로 새 탭에서 열어 브라우저 기본 다운로드를 사용하세요."
-        );
-        showLinks(raw);
-      } finally {
-        downloadBtn.disabled = false;
-        downloadBtn.textContent = "다운로드";
-      }
+    function toValidFilename(name) {
+      return (name || "file")
+        .replace(/[\\/:*?"<>|]/g, "_")
+        .replace(/\s+/g, " ")
+        .trim();
     }
 
-    downloadBtn.addEventListener("click", handleDownload);
-    urlInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") handleDownload();
+    // Parse "1-3,5,8-10" -> [1,2,3,5,8,9,10]
+    function parsePageSpec(spec, maxPage) {
+      if (!spec || !spec.trim()) throw new Error("페이지 지정이 비어있습니다.");
+      const cleaned = spec.replace(/\s+/g, "");
+      const parts = cleaned.split(",");
+      const pages = new Set();
+
+      for (const part of parts) {
+        if (!part) continue;
+        if (part.includes("-")) {
+          const [a, b] = part.split("-").map(x => parseInt(x, 10));
+          if (!Number.isInteger(a) || !Number.isInteger(b)) throw new Error(`잘못된 범위: ${part}`);
+          const start = Math.min(a, b);
+          const end = Math.max(a, b);
+          if (start < 1 || end > maxPage) throw new Error(`범위 초과: ${part} (총 ${maxPage}페이지)`);
+          for (let p = start; p <= end; p++) pages.add(p);
+        } else {
+          const p = parseInt(part, 10);
+          if (!Number.isInteger(p)) throw new Error(`잘못된 페이지: ${part}`);
+          if (p < 1 || p > maxPage) throw new Error(`페이지 초과: ${p} (총 ${maxPage}페이지)`);
+          pages.add(p);
+        }
+      }
+
+      return Array.from(pages).sort((x, y) => x - y);
+    }
+
+    // -------------------------
+    // MERGE
+    // -------------------------
+    const mergeFilesEl = $("#mergeFiles");
+    const mergeBtn = $("#mergeBtn");
+    const mergeClearBtn = $("#mergeClearBtn");
+    const mergeStatus = $("#mergeStatus");
+
+    mergeFilesEl.addEventListener("change", () => {
+      const files = mergeFilesEl.files ? Array.from(mergeFilesEl.files) : [];
+      mergeBtn.disabled = files.length < 2;
+      setStatus(mergeStatus, files.length ? `선택됨: ${files.length}개` : "");
     });
+
+    mergeClearBtn.addEventListener("click", () => {
+      mergeFilesEl.value = "";
+      mergeBtn.disabled = true;
+      setStatus(mergeStatus, "");
+    });
+
+    mergeBtn.addEventListener("click", async () => {
+      const files = Array.from(mergeFilesEl.files || []);
+      if (files.length < 2) return;
+
+      mergeBtn.disabled = true;
+      setStatus(mergeStatus, "병합 중...");
+
+      try {
+        const mergedPdf = await PDFLib.PDFDocument.create();
+
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i];
+          setStatus(mergeStatus, `병합 중... (${i + 1}/${files.length}) ${f.name}`);
+
+          const bytes = await f.arrayBuffer();
+          const pdf = await PDFLib.PDFDocument.load(bytes);
+
+          const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+          copiedPages.forEach(p => mergedPdf.addPage(p));
+        }
+
+        const outBytes = await mergedPdf.save();
+        const blob = new Blob([outBytes], { type: "application/pdf" });
+
+        const filename = `merged_${new Date().toISOString().slice(0,10)}.pdf`;
+        downloadBlob(blob, filename);
+
+        setStatus(mergeStatus, `완료: ${filename}`);
+      } catch (e) {
+        console.error(e);
+        setStatus(mergeStatus, `오류: ${e.message || e}`);
+      } finally {
+        mergeBtn.disabled = false;
+      }
+    });
+
+    // -------------------------
+    // SPLIT
+    // -------------------------
+    const splitFileEl = $("#splitFile");
+    const splitModeEl = $("#splitMode");
+    const pageSpecEl = $("#pageSpec");
+    const chunkSizeEl = $("#chunkSize");
+    const rangeBox = $("#rangeBox");
+    const chunkBox = $("#chunkBox");
+    const splitBtn = $("#splitBtn");
+    const splitClearBtn = $("#splitClearBtn");
+    const splitStatus = $("#splitStatus");
+
+    function refreshSplitUI() {
+      const mode = splitModeEl.value;
+      rangeBox.classList.toggle("hidden", mode !== "range");
+      chunkBox.classList.toggle("hidden", mode !== "chunks");
+
+      const hasFile = !!(splitFileEl.files && splitFileEl.files.length === 1);
+      splitBtn.disabled = !hasFile;
+      setStatus(splitStatus, hasFile ? `선택됨: ${splitFileEl.files[0].name}` : "");
+    }
+
+    splitFileEl.addEventListener("change", refreshSplitUI);
+    splitModeEl.addEventListener("change", refreshSplitUI);
+
+    splitClearBtn.addEventListener("click", () => {
+      splitFileEl.value = "";
+      pageSpecEl.value = "";
+      chunkSizeEl.value = "";
+      splitBtn.disabled = true;
+      setStatus(splitStatus, "");
+    });
+
+    splitBtn.addEventListener("click", async () => {
+      const file = splitFileEl.files && splitFileEl.files[0];
+      if (!file) return;
+
+      splitBtn.disabled = true;
+      setStatus(splitStatus, "분할 준비 중...");
+
+      try {
+        const baseName = toValidFilename(file.name.replace(/\.pdf$/i, "")) || "pdf";
+        const bytes = await file.arrayBuffer();
+        const srcPdf = await PDFLib.PDFDocument.load(bytes);
+        const totalPages = srcPdf.getPageCount();
+
+        const mode = splitModeEl.value;
+
+        if (mode === "range") {
+          const pages1based = parsePageSpec(pageSpecEl.value, totalPages);
+          setStatus(splitStatus, `추출 중... (${pages1based.length}페이지 선택)`);
+
+          const outPdf = await PDFLib.PDFDocument.create();
+          const indices0based = pages1based.map(p => p - 1);
+          const copied = await outPdf.copyPages(srcPdf, indices0based);
+          copied.forEach(p => outPdf.addPage(p));
+
+          const outBytes = await outPdf.save();
+          const blob = new Blob([outBytes], { type: "application/pdf" });
+          const filename = `${baseName}_pages_${pages1based.join("-")}.pdf`;
+          downloadBlob(blob, filename);
+          setStatus(splitStatus, `완료: ${filename}`);
+          return;
+        }
+
+        // ZIP output for multi files
+        const zip = new JSZip();
+
+        if (mode === "each") {
+          setStatus(splitStatus, `개별 분할 중... (총 ${totalPages}페이지)`);
+          for (let i = 0; i < totalPages; i++) {
+            setStatus(splitStatus, `개별 분할 중... (${i + 1}/${totalPages})`);
+            const outPdf = await PDFLib.PDFDocument.create();
+            const [page] = await outPdf.copyPages(srcPdf, [i]);
+            outPdf.addPage(page);
+            const outBytes = await outPdf.save();
+            zip.file(`${baseName}_p${String(i + 1).padStart(3, "0")}.pdf`, outBytes);
+          }
+        }
+
+        if (mode === "chunks") {
+          const n = parseInt(chunkSizeEl.value, 10);
+          if (!Number.isInteger(n) || n <= 0) throw new Error("묶음 크기(N페이지)는 1 이상의 정수여야 합니다.");
+
+          const chunkCount = Math.ceil(totalPages / n);
+          setStatus(splitStatus, `N페이지 단위 분할 중... (N=${n}, 총 ${chunkCount}개 파일)`);
+
+          let fileIdx = 0;
+          for (let start = 0; start < totalPages; start += n) {
+            fileIdx++;
+            const end = Math.min(start + n, totalPages);
+            setStatus(splitStatus, `분할 중... (${fileIdx}/${chunkCount}) pages ${start + 1}-${end}`);
+
+            const outPdf = await PDFLib.PDFDocument.create();
+            const indices = [];
+            for (let i = start; i < end; i++) indices.push(i);
+
+            const copied = await outPdf.copyPages(srcPdf, indices);
+            copied.forEach(p => outPdf.addPage(p));
+
+            const outBytes = await outPdf.save();
+            zip.file(`${baseName}_${String(start + 1).padStart(3, "0")}-${String(end).padStart(3, "0")}.pdf`, outBytes);
+          }
+        }
+
+        setStatus(splitStatus, "ZIP 생성 중...");
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const zipName = `${baseName}_split_${new Date().toISOString().slice(0,10)}.zip`;
+        downloadBlob(zipBlob, zipName);
+        setStatus(splitStatus, `완료: ${zipName}`);
+
+      } catch (e) {
+        console.error(e);
+        setStatus(splitStatus, `오류: ${e.message || e}`);
+      } finally {
+        splitBtn.disabled = false;
+      }
+    });
+
+    refreshSplitUI();
   </script>
 </body>
 </html>
