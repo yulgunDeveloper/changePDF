@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChangePDF - 병합</title>
+  <style>
+    :root{
+      --bg:#fff; --text:#0f172a; --muted:#64748b; --line:#e5e7eb;
+      --primary:#2563eb; --primaryHover:#1d4ed8;
+      --danger:#dc2626; --dangerHover:#b91c1c;
+      --shadow:0 16px 32px rgba(15,23,42,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1150px;margin:0 auto;padding:26px 16px 80px}
+    header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    h1{margin:0;font-size:20px}
+    .sub{margin:6px 0 0;color:var(--muted);line-height:1.5}
+    .card{margin-top:16px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:16px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .btn{border:none;cursor:pointer;border-radius:14px;padding:10px 12px;font-weight:900;transition:.15s}
+    .btn.primary{background:var(--primary);color:#fff}
+    .btn.primary:hover{background:var(--primaryHover)}
+    .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--text)}
+    .btn.ghost:hover{border-color:#cbd5e1}
+    .btn.danger{background:var(--danger);color:#fff}
+    .btn.danger:hover{background:var(--dangerHover)}
+    .meta{color:var(--muted);font-size:13px;white-space:pre-wrap;margin-top:10px}
+    input[type="file"]{display:none}
+
+    .toolbar{
+      display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;
+      padding:10px;border:1px dashed #cbd5e1;background:#f8fafc;border-radius:16px;margin-top:12px;
+    }
+    .group{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .group strong{font-size:13px}
+    .mini{border:1px solid var(--line);background:#fff;color:var(--text);padding:8px 10px;border-radius:12px;cursor:pointer;font-weight:800}
+    .mini:hover{border-color:#cbd5e1}
+    .mini.danger{border-color:rgba(220,38,38,.35);color:#991b1b}
+    .mini.danger:hover{background:#fef2f2}
+
+    .pages{
+      display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:12px;
+    }
+    @media (max-width:1100px){.pages{grid-template-columns:repeat(4,minmax(0,1fr));}}
+    @media (max-width:900px){.pages{grid-template-columns:repeat(3,minmax(0,1fr));}}
+    @media (max-width:650px){.pages{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+    .pageCard{
+      border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden;user-select:none;
+      transition:.12s ease;
+    }
+    .pageCard:hover{border-color:#cbd5e1;transform:translateY(-1px)}
+    .pageCard[draggable="true"]{cursor:grab}
+    .pageCard.dragging{opacity:.55;outline:2px dashed rgba(37,99,235,.45);outline-offset:2px;cursor:grabbing;transform:none}
+    .pageCard.dropTarget{outline:2px solid rgba(37,99,235,.45);outline-offset:2px}
+
+    .top{
+      display:flex;justify-content:space-between;gap:8px;align-items:center;
+      padding:10px 10px 8px;border-bottom:1px solid var(--line);
+    }
+    .info{min-width:0}
+    .name{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+    .num{font-size:13px;font-weight:950}
+    .check{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+    .check input{width:16px;height:16px}
+    .canvasWrap{padding:10px;background:#f8fafc}
+    canvas{width:100%;height:auto;display:block;border-radius:10px;background:#fff}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>PDF 병합</h1>
+        <p class="sub">파일 추가, 페이지 포함/제외, 드래그 정렬, 다중이동/삭제 후 “완료”를 누르면 병합 PDF를 다운로드합니다.</p>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="backHome">처음으로</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="row">
+        <button class="btn primary" id="addFilesBtn">파일 추가</button>
+        <button class="btn ghost" id="reloadBtn">미리보기 새로고침</button>
+        <button class="btn danger" id="clearJobBtn">이 작업 비우기</button>
+        <input id="addFilesInput" type="file" accept="application/pdf" multiple />
+      </div>
+
+      <div class="toolbar">
+        <div class="group">
+          <strong>선택</strong>
+          <button class="mini" id="selectAll">전체 포함</button>
+          <button class="mini" id="selectNone">전체 제외</button>
+        </div>
+        <div class="group">
+          <strong>다중 이동(포함 체크된 페이지)</strong>
+          <button class="mini" id="moveFirst">맨 앞으로</button>
+          <button class="mini" id="moveUp">앞으로 1칸</button>
+          <button class="mini" id="moveDown">뒤로 1칸</button>
+          <button class="mini" id="moveLast">맨 뒤로</button>
+          <button class="mini danger" id="deleteSelected">선택 삭제</button>
+        </div>
+        <div class="group">
+          <strong>완료</strong>
+          <button class="btn primary" id="doneBtn">병합 다운로드</button>
+        </div>
+      </div>
+
+      <div id="meta" class="meta"></div>
+      <div id="pages" class="pages"></div>
+      <div id="status" class="meta"></div>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.js"></script>
+
+  <script>
+    // ===== Shared IndexedDB helper (same as index) =====
+    const DB_NAME = "changePDF";
+    const DB_VERSION = 1;
+    const STORE = "jobs";
+
+    function openDB(){
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "jobId" });
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function getJob(jobId){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readonly");
+        const req = tx.objectStore(STORE).get(jobId);
+        req.onsuccess = () => { db.close(); resolve(req.result || null); };
+        req.onerror = () => { db.close(); reject(req.error); };
+      });
+    }
+    async function putJob(job){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).put(job);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    }
+    async function addFilesToJob(jobId, fileList){
+      const job = (await getJob(jobId)) || { jobId, createdAt: Date.now(), files: [] };
+      const files = Array.from(fileList || []);
+      for (const f of files){
+        const bytes = await f.arrayBuffer();
+        job.files.push({
+          id: "f_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7),
+          name: f.name,
+          type: f.type || "application/pdf",
+          bytes
+        });
+      }
+      await putJob(job);
+      return job;
+    }
+    async function clearJob(jobId){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).delete(jobId);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    }
+
+    // ===== PDF.js worker =====
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.js";
+
+    const $ = (s) => document.querySelector(s);
+    const pagesEl = $("#pages");
+    const metaEl = $("#meta");
+    const statusEl = $("#status");
+
+    function setStatus(msg){ statusEl.textContent = msg || ""; }
+    function setMeta(msg){ metaEl.textContent = msg || ""; }
+
+    function qs(name){
+      const u = new URL(location.href);
+      return u.searchParams.get(name);
+    }
+
+    const jobId = qs("jobId");
+    if (!jobId){
+      location.href = "index.html";
+    }
+
+    // ===== State for merge page items =====
+    // uid => { fileId, fileName, fileIndexInJob, pageNumber1 }
+    const itemByUid = new Map();
+    // uid => checkbox
+    const uiByUid = new Map();
+    // pdfBytes list from job for pdf-lib
+    let jobFiles = []; // [{id,name,bytes}]
+    let pdfJsDocs = []; // pdf.js doc per job file
+
+    // ===== UI card =====
+    function createCard({uid, fileName, pageNumber1, checked=true}){
+      const card = document.createElement("div");
+      card.className = "pageCard";
+      card.dataset.uid = uid;
+      card.draggable = true;
+
+      const top = document.createElement("div");
+      top.className = "top";
+
+      const info = document.createElement("div");
+      info.className = "info";
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = fileName;
+      const num = document.createElement("div");
+      num.className = "num";
+      num.textContent = "p." + pageNumber1;
+      info.appendChild(name);
+      info.appendChild(num);
+
+      const check = document.createElement("label");
+      check.className = "check";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = checked;
+      const span = document.createElement("span");
+      span.textContent = "포함";
+      check.appendChild(cb);
+      check.appendChild(span);
+
+      top.appendChild(info);
+      top.appendChild(check);
+
+      const canvasWrap = document.createElement("div");
+      canvasWrap.className = "canvasWrap";
+      const canvas = document.createElement("canvas");
+      canvasWrap.appendChild(canvas);
+
+      card.appendChild(top);
+      card.appendChild(canvasWrap);
+
+      // click toggles checkbox (except direct click on checkbox)
+      card.addEventListener("click", (e) => {
+        if (e.target === cb) return;
+        cb.checked = !cb.checked;
+        updateSummary();
+      });
+      cb.addEventListener("change", updateSummary);
+
+      return { card, canvas, cb };
+    }
+
+    async function renderThumb(pdfDoc, pageNumber1, canvas, scale=0.35){
+      const page = await pdfDoc.getPage(pageNumber1);
+      const viewport = page.getViewport({ scale });
+      const ctx = canvas.getContext("2d", { alpha:false });
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+    }
+
+    // ===== Drag & Drop =====
+    function enableDnD(container){
+      let draggingEl = null;
+
+      const getDragAfter = (y) => {
+        const els = [...container.querySelectorAll(".pageCard[draggable='true']:not(.dragging)")];
+        let closest = { offset: Number.NEGATIVE_INFINITY, el: null };
+        for (const child of els){
+          const box = child.getBoundingClientRect();
+          const offset = y - (box.top + box.height / 2);
+          if (offset < 0 && offset > closest.offset){
+            closest = { offset, el: child };
+          }
+        }
+        return closest.el;
+      };
+
+      container.addEventListener("dragstart", (e) => {
+        const card = e.target.closest(".pageCard");
+        if (!card) return;
+        draggingEl = card;
+        card.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", card.dataset.uid || "");
+      });
+
+      container.addEventListener("dragend", () => {
+        if (draggingEl) draggingEl.classList.remove("dragging");
+        draggingEl = null;
+        container.querySelectorAll(".dropTarget").forEach(x => x.classList.remove("dropTarget"));
+        updateSummary();
+      });
+
+      container.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        const after = getDragAfter(e.clientY);
+        const dragging = container.querySelector(".dragging");
+        if (!dragging) return;
+
+        container.querySelectorAll(".dropTarget").forEach(x => x.classList.remove("dropTarget"));
+        if (after) after.classList.add("dropTarget");
+
+        if (after == null) container.appendChild(dragging);
+        else container.insertBefore(dragging, after);
+      });
+
+      container.addEventListener("drop", (e) => {
+        e.preventDefault();
+        container.querySelectorAll(".dropTarget").forEach(x => x.classList.remove("dropTarget"));
+        updateSummary();
+      });
+    }
+
+    // ===== Multi-move / delete based on "포함" checkbox =====
+    function getSelectedCards(){
+      const cards = Array.from(pagesEl.children).filter(x => x.classList.contains("pageCard"));
+      const selected = [];
+      for (const card of cards){
+        const uid = card.dataset.uid;
+        const cb = uiByUid.get(uid);
+        if (cb && cb.checked) selected.push(card);
+      }
+      return selected;
+    }
+
+    function moveSelectedToFirst(){
+      const selected = getSelectedCards();
+      if (selected.length === 0) return false;
+      selected.forEach(card => pagesEl.insertBefore(card, pagesEl.firstChild));
+      return true;
+    }
+    function moveSelectedToLast(){
+      const selected = getSelectedCards();
+      if (selected.length === 0) return false;
+      selected.forEach(card => pagesEl.appendChild(card));
+      return true;
+    }
+    function moveSelectedUpOne(){
+      const selectedSet = new Set(getSelectedCards());
+      if (selectedSet.size === 0) return false;
+      const cards = Array.from(pagesEl.children).filter(x => x.classList.contains("pageCard"));
+      for (let i=0; i<cards.length; i++){
+        const card = cards[i];
+        if (!selectedSet.has(card)) continue;
+        const prev = card.previousElementSibling;
+        if (prev && !selectedSet.has(prev)){
+          pagesEl.insertBefore(card, prev);
+        }
+      }
+      return true;
+    }
+    function moveSelectedDownOne(){
+      const selectedSet = new Set(getSelectedCards());
+      if (selectedSet.size === 0) return false;
+      const cards = Array.from(pagesEl.children).filter(x => x.classList.contains("pageCard"));
+      for (let i=cards.length-1; i>=0; i--){
+        const card = cards[i];
+        if (!selectedSet.has(card)) continue;
+        const next = card.nextElementSibling;
+        if (next && !selectedSet.has(next)){
+          pagesEl.insertBefore(next, card); // swap
+        }
+      }
+      return true;
+    }
+    function deleteSelected(){
+      const selected = getSelectedCards();
+      if (selected.length === 0) return false;
+      for (const card of selected){
+        const uid = card.dataset.uid;
+        card.remove();
+        uiByUid.delete(uid);
+        itemByUid.delete(uid);
+      }
+      return true;
+    }
+
+    function updateSummary(){
+      const total = itemByUid.size;
+      let selected = 0;
+      for (const cb of uiByUid.values()){
+        if (cb.checked) selected++;
+      }
+      setMeta(`jobId=${jobId} | 파일 ${jobFiles.length}개 | 페이지 ${total}개 | 포함 ${selected}개`);
+    }
+
+    // ===== Load job and render preview =====
+    async function loadAndRender(){
+      setStatus("작업 로딩 중...");
+      pagesEl.innerHTML = "";
+      itemByUid.clear();
+      uiByUid.clear();
+      pdfJsDocs = [];
+
+      const job = await getJob(jobId);
+      if (!job || !job.files || job.files.length === 0){
+        setStatus("파일이 없습니다. 처음 페이지로 돌아가 파일을 추가하세요.");
+        setMeta(`jobId=${jobId}`);
+        return;
+      }
+
+      jobFiles = job.files;
+
+      // Load pdf.js docs
+      for (let i=0; i<jobFiles.length; i++){
+        const f = jobFiles[i];
+        const doc = await pdfjsLib.getDocument({ data: f.bytes }).promise;
+        pdfJsDocs.push(doc);
+      }
+
+      // Render pages sequentially
+      let totalPages = pdfJsDocs.reduce((a, d) => a + d.numPages, 0);
+      setMeta(`jobId=${jobId} | 파일 ${jobFiles.length}개 | 페이지 ${totalPages}개`);
+      setStatus("페이지 미리보기 생성 중...");
+
+      enableDnD(pagesEl);
+
+      let global = 0;
+      for (let fileIndex=0; fileIndex<pdfJsDocs.length; fileIndex++){
+        const doc = pdfJsDocs[fileIndex];
+        const file = jobFiles[fileIndex];
+
+        for (let p=1; p<=doc.numPages; p++){
+          global++;
+          const uid = `m-${file.id}-${p}-${global}`;
+          itemByUid.set(uid, { fileIndex, fileId: file.id, fileName: file.name, pageNumber1: p });
+
+          const { card, canvas, cb } = createCard({ uid, fileName: file.name, pageNumber1: p, checked: true });
+          pagesEl.appendChild(card);
+          uiByUid.set(uid, cb);
+
+          await renderThumb(doc, p, canvas, 0.35);
+          if (global % 12 === 0) setStatus(`페이지 미리보기 생성 중... (${global}/${totalPages})`);
+        }
+      }
+
+      updateSummary();
+      setStatus("완료. 포함/정렬/삭제 후 병합 다운로드를 누르세요.");
+    }
+
+    // ===== Merge and download =====
+    async function mergeAndDownload(){
+      // DOM order + checked
+      const orderedUids = Array.from(pagesEl.children).map(el => el.dataset.uid).filter(Boolean);
+      const selectedItems = [];
+      for (const uid of orderedUids){
+        const cb = uiByUid.get(uid);
+        if (!cb || !cb.checked) continue;
+        const item = itemByUid.get(uid);
+        if (item) selectedItems.push(item);
+      }
+      if (selectedItems.length === 0){
+        setStatus("포함(체크)된 페이지가 없습니다.");
+        return;
+      }
+
+      const mergedPdf = await PDFLib.PDFDocument.create();
+      const pdfLibDocs = new Map(); // fileIndex -> pdf-lib doc
+
+      for (let i=0; i<selectedItems.length; i++){
+        const s = selectedItems[i];
+        if (!pdfLibDocs.has(s.fileIndex)){
+          const bytes = jobFiles[s.fileIndex].bytes;
+          const doc = await PDFLib.PDFDocument.load(bytes);
+          pdfLibDocs.set(s.fileIndex, doc);
+        }
+        const src = pdfLibDocs.get(s.fileIndex);
+        const [copied] = await mergedPdf.copyPages(src, [s.pageNumber1 - 1]);
+        mergedPdf.addPage(copied);
+
+        if ((i+1) % 25 === 0) setStatus(`병합 중... (${i+1}/${selectedItems.length})`);
+      }
+
+      const outBytes = await mergedPdf.save();
+      const blob = new Blob([outBytes], { type:"application/pdf" });
+
+      const filename = `merged_${new Date().toISOString().slice(0,10)}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+
+      setStatus(`완료: ${filename}`);
+    }
+
+    // ===== Events =====
+    $("#backHome").addEventListener("click", () => location.href = "index.html");
+    $("#reloadBtn").addEventListener("click", loadAndRender);
+
+    $("#addFilesBtn").addEventListener("click", () => $("#addFilesInput").click());
+    $("#addFilesInput").addEventListener("change", async () => {
+      if (!$("#addFilesInput").files || $("#addFilesInput").files.length === 0) return;
+      setStatus("파일 추가 저장 중...");
+      await addFilesToJob(jobId, $("#addFilesInput").files);
+      $("#addFilesInput").value = "";
+      await loadAndRender();
+    });
+
+    $("#clearJobBtn").addEventListener("click", async () => {
+      await clearJob(jobId);
+      setStatus("이 작업(jobId)을 비웠습니다. 처음으로 돌아가 파일을 추가하세요.");
+      pagesEl.innerHTML = "";
+      itemByUid.clear(); uiByUid.clear();
+      setMeta(`jobId=${jobId} | 비어있음`);
+    });
+
+    $("#selectAll").addEventListener("click", () => { for (const cb of uiByUid.values()) cb.checked = true; updateSummary(); });
+    $("#selectNone").addEventListener("click", () => { for (const cb of uiByUid.values()) cb.checked = false; updateSummary(); });
+
+    $("#moveFirst").addEventListener("click", () => { if (!moveSelectedToFirst()) setStatus("포함(체크)된 페이지가 없습니다."); updateSummary(); });
+    $("#moveLast").addEventListener("click", () => { if (!moveSelectedToLast()) setStatus("포함(체크)된 페이지가 없습니다."); updateSummary(); });
+    $("#moveUp").addEventListener("click", () => { if (!moveSelectedUpOne()) setStatus("포함(체크)된 페이지가 없습니다."); updateSummary(); });
+    $("#moveDown").addEventListener("click", () => { if (!moveSelectedDownOne()) setStatus("포함(체크)된 페이지가 없습니다."); updateSummary(); });
+    $("#deleteSelected").addEventListener("click", () => { if (!deleteSelected()) setStatus("포함(체크)된 페이지가 없습니다."); updateSummary(); });
+
+    $("#doneBtn").addEventListener("click", async () => {
+      $("#doneBtn").disabled = true;
+      try{
+        setStatus("병합 준비 중...");
+        await mergeAndDownload();
+      } catch(e){
+        console.error(e);
+        setStatus("오류: " + (e.message || e));
+      } finally {
+        $("#doneBtn").disabled = false;
+      }
+    });
+
+    // init
+    loadAndRender();
+  </script>
+</body>
+</html>

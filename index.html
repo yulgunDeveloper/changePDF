@@ -3,997 +3,228 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>PDF 병합 / 분할</title>
-
+  <title>ChangePDF - 시작</title>
   <style>
     :root{
-      --bg:#ffffff;
-      --text:#0f172a;
-      --muted:#64748b;
-      --line:#e5e7eb;
-      --card:#ffffff;
-      --shadow: 0 10px 24px rgba(15,23,42,.08);
-      --primary:#2563eb;
-      --primaryHover:#1d4ed8;
-      --danger:#dc2626;
-      --dangerHover:#b91c1c;
-      --chip:#f1f5f9;
-      --focus: 0 0 0 3px rgba(37,99,235,.25);
+      --bg:#fff; --text:#0f172a; --muted:#64748b; --line:#e5e7eb;
+      --primary:#2563eb; --primaryHover:#1d4ed8;
+      --card:#fff; --shadow:0 16px 32px rgba(15,23,42,.08);
     }
-
-    * { box-sizing: border-box; }
-    body{
-      margin:0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
-      background:var(--bg);
-      color:var(--text);
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:980px;margin:0 auto;padding:28px 16px 80px}
+    header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    h1{margin:0;font-size:22px;letter-spacing:-.2px}
+    .sub{margin:6px 0 0;color:var(--muted);line-height:1.5}
+    .card{margin-top:18px;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:18px}
+    .dz{
+      border:2px dashed #cbd5e1;border-radius:18px;background:#f8fafc;
+      padding:26px; text-align:center; transition:.15s ease;
     }
-    .wrap{ max-width:1100px; margin:0 auto; padding: 26px 16px 80px; }
-    header{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
-    h1{ font-size: 22px; margin:0; letter-spacing:-.2px; }
-    .sub{ margin: 6px 0 0; color:var(--muted); line-height:1.5; }
-
-    .topActions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:flex-end; }
-    .pill{
-      display:inline-flex; align-items:center; gap:6px;
-      padding:8px 10px; border:1px solid var(--line); border-radius:999px; background:var(--chip);
-      color:var(--muted); font-size:12px;
-    }
-
-    .tabs{
-      display:flex; gap:8px; margin: 18px 0;
-      border-bottom:1px solid var(--line);
-      padding-bottom:12px;
-    }
-    .tabbtn{
-      border:1px solid var(--line);
-      background:#fff;
-      color:var(--text);
-      padding:10px 12px;
-      border-radius:12px;
-      cursor:pointer;
-      font-weight:800;
-      transition: .15s ease;
-    }
-    .tabbtn:hover{ border-color:#cbd5e1; }
-    .tabbtn.active{
-      border-color: rgba(37,99,235,.35);
-      box-shadow: var(--focus);
-    }
-
-    .card{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:16px;
-      box-shadow: var(--shadow);
-      padding: 16px;
-    }
-    .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    @media (max-width: 900px){ .grid2{ grid-template-columns: 1fr; } }
-
-    label{ display:block; font-size:13px; color:var(--muted); margin-bottom: 6px; }
-    input[type="file"], select{
-      width:min(560px, 100%);
-      padding: 10px 12px;
-      border:1px solid var(--line);
-      border-radius: 12px;
-      background:#fff;
-      color:var(--text);
-      outline:none;
-    }
-    input[type="file"]:focus, select:focus { box-shadow: var(--focus); border-color: rgba(37,99,235,.4); }
-
+    .dz.dragover{background:#eef2ff;border-color:rgba(37,99,235,.45)}
+    .dzTitle{font-weight:900;font-size:18px;margin:0 0 6px}
+    .dzDesc{margin:0;color:var(--muted);line-height:1.5}
+    .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:14px}
     .btn{
-      border:none;
-      padding: 10px 14px;
-      border-radius: 12px;
-      cursor:pointer;
-      font-weight:900;
+      border:none;cursor:pointer;border-radius:14px;padding:12px 14px;font-weight:900;
+      background:var(--primary);color:#fff;transition:.15s ease;
+    }
+    .btn:hover{background:var(--primaryHover)}
+    .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--text)}
+    .btn.ghost:hover{border-color:#cbd5e1}
+    input[type="file"]{display:none}
+    .meta{margin-top:12px;color:var(--muted);font-size:13px;white-space:pre-wrap;text-align:center}
+    .toolRow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+    .toolCard{
+      width:min(320px, 100%);
+      border:1px solid var(--line);border-radius:16px;padding:14px;background:#fff;cursor:pointer;
       transition:.15s ease;
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
     }
-    .btn.primary{ background:var(--primary); color:#fff; }
-    .btn.primary:hover{ background:var(--primaryHover); }
-    .btn.ghost{ background:#fff; border:1px solid var(--line); color:var(--text); }
-    .btn.ghost:hover{ border-color:#cbd5e1; }
-    .btn.danger{ background:var(--danger); color:#fff; }
-    .btn.danger:hover{ background:var(--dangerHover); }
-    .btn:disabled{ opacity:.6; cursor:not-allowed; }
-
-    .hint{ font-size:12px; color:var(--muted); line-height:1.5; margin-top:8px; }
-    .status{ margin-top: 10px; font-size: 13px; color: var(--muted); white-space: pre-wrap; }
-
-    .stepHead{
-      display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
-      margin-bottom: 10px;
-    }
-    .stepTitle{ font-size: 16px; font-weight: 950; margin:0; }
-    .stepMeta{ color:var(--muted); font-size:12px; }
-
-    .toolbar{
-      display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
-      gap:10px;
-      padding: 10px;
-      border:1px dashed #cbd5e1;
-      background:#f8fafc;
-      border-radius: 14px;
-      margin: 12px 0;
-    }
-    .toolbar .group{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .toolbar .group strong{ font-size: 13px; }
-
-    .toolbar .mini{
-      border:1px solid var(--line); background:#fff; color:var(--text);
-      padding: 8px 10px; border-radius: 12px; cursor:pointer; font-weight:800;
-    }
-    .toolbar .mini:hover{ border-color:#cbd5e1; }
-    .toolbar .mini.danger{
-      border-color: rgba(220,38,38,.25);
-      color:#991b1b;
-      background:#fff;
-    }
-    .toolbar .mini.danger:hover{
-      border-color: rgba(220,38,38,.45);
-      background:#fef2f2;
-    }
-
-    .pages{
-      display:grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap:12px;
-    }
-    @media (max-width: 1100px){ .pages{ grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-    @media (max-width: 900px){ .pages{ grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-    @media (max-width: 650px){ .pages{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-
-    .pageCard{
-      border:1px solid var(--line);
-      background:#fff;
-      border-radius: 14px;
-      overflow:hidden;
-      transition:.12s ease;
-      position: relative;
-      user-select: none;
-    }
-    .pageCard:hover{ border-color:#cbd5e1; transform: translateY(-1px); }
-
-    .pageCard[draggable="true"]{ cursor: grab; }
-    .pageCard.dragging{
-      opacity: .55;
-      transform: none;
-      cursor: grabbing;
-      outline: 2px dashed rgba(37,99,235,.45);
-      outline-offset: 2px;
-    }
-    .pageCard.dropTarget{
-      outline: 2px solid rgba(37,99,235,.45);
-      outline-offset: 2px;
-    }
-
-    .pageTop{
-      display:flex; align-items:center; justify-content:space-between;
-      padding: 10px 10px 8px;
-      gap:8px;
-      border-bottom:1px solid var(--line);
-      background:#ffffff;
-    }
-    .pageInfo{
-      display:flex; flex-direction:column; gap:2px; min-width:0;
-    }
-    .pageInfo .name{
-      font-size: 12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-      max-width: 210px;
-    }
-    .pageInfo .num{
-      font-size: 13px; font-weight: 950;
-    }
-    .checkWrap{
-      display:flex; align-items:center; gap:8px;
-      font-size: 12px;
-      color: var(--muted);
-      user-select:none;
-    }
-    .checkWrap input{ width:16px; height:16px; }
-
-    .canvasWrap{
-      padding: 10px;
-      background:#f8fafc;
-    }
-    canvas{ width: 100%; height: auto; display:block; border-radius: 10px; background:#fff; }
-
-    .hidden{ display:none !important; }
-
-    .footerNote{ margin-top: 18px; font-size: 12px; color: var(--muted); }
+    .toolCard:hover{transform:translateY(-1px);border-color:#cbd5e1}
+    .toolTitle{margin:0;font-size:16px;font-weight:950}
+    .toolDesc{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.45}
+    .disabled{opacity:.6;pointer-events:none}
   </style>
 </head>
-
 <body>
   <div class="wrap">
     <header>
       <div>
-        <h1>PDF 병합 / 분할</h1>
-        <p class="sub">
-          업로드한 PDF를 페이지 미리보기로 확인한 뒤, 원하는 페이지만 선택해서 병합/분할합니다.
-          병합 화면에서는 드래그&드롭으로 순서 변경, 다중선택 이동, 선택 페이지 삭제가 가능합니다.
-        </p>
-      </div>
-      <div class="topActions">
-        <span class="pill">미리보기: PDF.js</span>
-        <span class="pill">편집: pdf-lib</span>
-        <span class="pill">ZIP: JSZip</span>
+        <h1>ChangePDF</h1>
+        <p class="sub">파일을 끌어다 놓고, 다음 페이지에서 미리보기를 보면서 병합/분할하세요. (IndexedDB에 임시 저장)</p>
       </div>
     </header>
 
-    <div class="tabs">
-      <button class="tabbtn active" data-tab="merge">병합</button>
-      <button class="tabbtn" data-tab="split">분할</button>
-    </div>
-
-    <!-- MERGE STEP 1 -->
-    <section id="merge-step1" class="card">
-      <div class="stepHead">
-        <p class="stepTitle">병합 (1/2) 파일 업로드</p>
-        <span class="stepMeta">여러 PDF를 선택하세요</span>
+    <section class="card">
+      <div id="dropzone" class="dz" role="button" tabindex="0">
+        <p class="dzTitle">PDF 파일을 끌어와서 놓으세요</p>
+        <p class="dzDesc">또는 버튼으로 파일을 선택하세요. 업로드 후 병합/분할 페이지로 이동합니다.</p>
+        <div class="row">
+          <button id="pickBtn" class="btn">파일 선택</button>
+          <button id="clearBtn" class="btn ghost">초기화</button>
+        </div>
+        <input id="fileInput" type="file" accept="application/pdf" multiple />
+        <div id="status" class="meta"></div>
       </div>
 
-      <div>
-        <label>PDF 파일 여러 개 선택</label>
-        <input id="mergeFiles" type="file" accept="application/pdf" multiple />
-        <div class="hint">
-          업로드 후 다음 화면에서 포함/제외 체크, 드래그로 순서 변경, 체크된 페이지를 묶어서 이동/삭제할 수 있습니다.
+      <div class="toolRow" style="margin-top:18px;">
+        <div id="goMerge" class="toolCard disabled" role="button" tabindex="0">
+          <p class="toolTitle">PDF 병합</p>
+          <p class="toolDesc">여러 파일을 합치고, 페이지 순서 변경/삭제 후 결과를 다운로드합니다.</p>
+        </div>
+        <div id="goSplit" class="toolCard disabled" role="button" tabindex="0">
+          <p class="toolTitle">PDF 분할</p>
+          <p class="toolDesc">한 파일을 페이지 단위로 추출하거나 개별 PDF/ZIP으로 분할합니다.</p>
         </div>
       </div>
-
-      <div class="row" style="margin-top:12px;">
-        <button id="mergeNextBtn" class="btn primary" disabled>페이지 미리보기로 이동</button>
-        <button id="mergeClearBtn" class="btn ghost">초기화</button>
-      </div>
-
-      <div class="status" id="mergeStatus"></div>
     </section>
-
-    <!-- MERGE STEP 2 -->
-    <section id="merge-step2" class="card hidden" style="margin-top:14px;">
-      <div class="stepHead">
-        <p class="stepTitle">병합 (2/2) 페이지 선택/정렬 후 다운로드</p>
-        <span class="stepMeta" id="mergeMeta"></span>
-      </div>
-
-      <div class="toolbar">
-        <div class="group">
-          <strong>선택</strong>
-          <button class="mini" id="mergeSelectAll">전체 선택</button>
-          <button class="mini" id="mergeSelectNone">전체 해제</button>
-        </div>
-
-        <div class="group">
-          <strong>다중 이동(체크된 페이지)</strong>
-          <button class="mini" id="mergeMoveFirst">맨 앞으로</button>
-          <button class="mini" id="mergeMoveUp">앞으로 1칸</button>
-          <button class="mini" id="mergeMoveDown">뒤로 1칸</button>
-          <button class="mini" id="mergeMoveLast">맨 뒤로</button>
-          <button class="mini danger" id="mergeDeleteSelected">선택 삭제</button>
-        </div>
-
-        <div class="group">
-          <strong>출력</strong>
-          <button id="mergeDownloadBtn" class="btn primary">선택 페이지 병합 PDF 다운로드</button>
-          <button id="mergeBackBtn" class="btn ghost">업로드로 돌아가기</button>
-        </div>
-      </div>
-
-      <div id="mergePages" class="pages"></div>
-      <div class="status" id="mergeStatus2"></div>
-    </section>
-
-    <!-- SPLIT STEP 1 -->
-    <section id="split-step1" class="card hidden" style="margin-top:14px;">
-      <div class="stepHead">
-        <p class="stepTitle">분할 (1/2) 파일 업로드</p>
-        <span class="stepMeta">PDF 1개를 선택하세요</span>
-      </div>
-
-      <div class="grid2">
-        <div>
-          <label>분할할 PDF 1개 선택</label>
-          <input id="splitFile" type="file" accept="application/pdf" />
-          <div class="hint">업로드 후 다음 화면에서 페이지를 보면서 체크할 수 있습니다.</div>
-        </div>
-
-        <div>
-          <label>분할 방식</label>
-          <select id="splitMode">
-            <option value="extract">선택 페이지 추출 → 1개 PDF</option>
-            <option value="eachzip">선택한 페이지를 각각 개별 PDF → ZIP</option>
-          </select>
-          <div class="hint">“개별 PDF”는 선택한 페이지마다 파일을 만들고 ZIP으로 내려받습니다.</div>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:12px;">
-        <button id="splitNextBtn" class="btn primary" disabled>페이지 미리보기로 이동</button>
-        <button id="splitClearBtn" class="btn ghost">초기화</button>
-      </div>
-
-      <div class="status" id="splitStatus"></div>
-    </section>
-
-    <!-- SPLIT STEP 2 -->
-    <section id="split-step2" class="card hidden" style="margin-top:14px;">
-      <div class="stepHead">
-        <p class="stepTitle">분할 (2/2) 페이지 선택 후 다운로드</p>
-        <span class="stepMeta" id="splitMeta"></span>
-      </div>
-
-      <div class="toolbar">
-        <div class="group">
-          <strong>선택</strong>
-          <button class="mini" id="splitSelectAll">전체 선택</button>
-          <button class="mini" id="splitSelectNone">전체 해제</button>
-        </div>
-        <div class="group">
-          <strong>출력</strong>
-          <button id="splitDownloadBtn" class="btn primary">다운로드</button>
-          <button id="splitBackBtn" class="btn ghost">업로드로 돌아가기</button>
-        </div>
-      </div>
-
-      <div id="splitPages" class="pages"></div>
-      <div class="status" id="splitStatus2"></div>
-    </section>
-
-    <div class="footerNote">
-      팁: 페이지가 많으면 썸네일 생성이 느릴 수 있습니다(브라우저 메모리/성능 영향).
-    </div>
   </div>
 
-  <!-- pdf-lib -->
-  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-  <!-- jszip -->
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <!-- pdf.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.js"></script>
-
   <script>
-    const $ = (sel) => document.querySelector(sel);
-    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+    // ========= IndexedDB helper (shared) =========
+    const DB_NAME = "changePDF";
+    const DB_VERSION = 1;
+    const STORE = "jobs"; // key: jobId, value: { jobId, createdAt, files:[{id,name,type,bytes}] }
 
-    function setStatus(el, msg){ el.textContent = msg || ""; }
-
-    function downloadBlob(blob, filename){
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    }
-
-    function toValidFilename(name){
-      return (name || "file")
-        .replace(/[\\/:*?"<>|]/g, "_")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-
-    // Tabs
-    function showTab(tab){
-      $$(".tabbtn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-
-      if (tab === "merge"){
-        $("#merge-step1").classList.remove("hidden");
-        $("#merge-step2").classList.add("hidden");
-
-        $("#split-step1").classList.add("hidden");
-        $("#split-step2").classList.add("hidden");
-      } else {
-        $("#split-step1").classList.remove("hidden");
-        $("#split-step2").classList.add("hidden");
-
-        $("#merge-step1").classList.add("hidden");
-        $("#merge-step2").classList.add("hidden");
-      }
-    }
-    $$(".tabbtn").forEach(btn => btn.addEventListener("click", () => showTab(btn.dataset.tab)));
-
-    // PDF.js worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.js";
-
-    async function renderPageThumb(pdfDoc, pageNumber, canvas, scale=0.35){
-      const page = await pdfDoc.getPage(pageNumber);
-      const viewport = page.getViewport({ scale });
-      const ctx = canvas.getContext("2d", { alpha:false });
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
-      await page.render({ canvasContext: ctx, viewport }).promise;
-    }
-
-    function createPageCard({ titleName, labelNumber, checked=true, draggable=false, uid=null }){
-      const card = document.createElement("div");
-      card.className = "pageCard";
-      if (uid) card.dataset.uid = uid;
-
-      if (draggable){
-        card.draggable = true;
-        card.title = "드래그해서 순서 변경";
-      }
-
-      const top = document.createElement("div");
-      top.className = "pageTop";
-
-      const info = document.createElement("div");
-      info.className = "pageInfo";
-      const name = document.createElement("div");
-      name.className = "name";
-      name.textContent = titleName;
-      const num = document.createElement("div");
-      num.className = "num";
-      num.textContent = labelNumber;
-      info.appendChild(name);
-      info.appendChild(num);
-
-      const checkWrap = document.createElement("label");
-      checkWrap.className = "checkWrap";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = checked;
-      const span = document.createElement("span");
-      span.textContent = "포함";
-      checkWrap.appendChild(checkbox);
-      checkWrap.appendChild(span);
-
-      top.appendChild(info);
-      top.appendChild(checkWrap);
-
-      const canvasWrap = document.createElement("div");
-      canvasWrap.className = "canvasWrap";
-      const canvas = document.createElement("canvas");
-      canvasWrap.appendChild(canvas);
-
-      card.appendChild(top);
-      card.appendChild(canvasWrap);
-
-      // 클릭하면 체크 토글(체크박스 직접 클릭 제외)
-      card.addEventListener("click", (e) => {
-        if (e.target === checkbox) return;
-        checkbox.checked = !checkbox.checked;
-      });
-
-      return { card, checkbox, canvas };
-    }
-
-    // =========================
-    // MERGE
-    // =========================
-    const mergeState = {
-      files: [],
-      pdfDocs: [],
-      pdfBytes: [],
-      itemByUid: new Map(),  // uid -> { fileIndex, pageNumber1, fileName }
-      uiByUid: new Map()     // uid -> { checkbox, card }
-    };
-
-    const mergeFilesEl = $("#mergeFiles");
-    const mergeNextBtn = $("#mergeNextBtn");
-    const mergeClearBtn = $("#mergeClearBtn");
-    const mergeStatus = $("#mergeStatus");
-
-    mergeFilesEl.addEventListener("change", () => {
-      const files = mergeFilesEl.files ? Array.from(mergeFilesEl.files) : [];
-      mergeNextBtn.disabled = files.length < 2;
-      setStatus(mergeStatus, files.length ? `선택됨: ${files.length}개` : "");
-    });
-
-    mergeClearBtn.addEventListener("click", () => {
-      mergeFilesEl.value = "";
-      mergeNextBtn.disabled = true;
-      setStatus(mergeStatus, "");
-    });
-
-    $("#mergeBackBtn").addEventListener("click", () => {
-      $("#merge-step2").classList.add("hidden");
-      $("#merge-step1").classList.remove("hidden");
-      $("#mergePages").innerHTML = "";
-
-      mergeState.files = [];
-      mergeState.pdfDocs = [];
-      mergeState.pdfBytes = [];
-      mergeState.itemByUid.clear();
-      mergeState.uiByUid.clear();
-
-      setStatus($("#mergeStatus2"), "");
-    });
-
-    $("#mergeSelectAll").addEventListener("click", () => {
-      for (const { checkbox } of mergeState.uiByUid.values()) checkbox.checked = true;
-      updateMergeSummary();
-    });
-
-    $("#mergeSelectNone").addEventListener("click", () => {
-      for (const { checkbox } of mergeState.uiByUid.values()) checkbox.checked = false;
-      updateMergeSummary();
-    });
-
-    // ---- Drag & Drop ----
-    function enableDnDForContainer(container){
-      let draggingEl = null;
-
-      const getDragAfterElement = (containerEl, y) => {
-        const draggableEls = [...containerEl.querySelectorAll(".pageCard[draggable='true']:not(.dragging)")];
-        let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
-
-        for (const child of draggableEls){
-          const box = child.getBoundingClientRect();
-          const offset = y - (box.top + box.height / 2);
-          if (offset < 0 && offset > closest.offset){
-            closest = { offset, element: child };
+    function openDB(){
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE)) {
+            db.createObjectStore(STORE, { keyPath: "jobId" });
           }
-        }
-        return closest.element;
-      };
-
-      container.addEventListener("dragstart", (e) => {
-        const card = e.target.closest(".pageCard");
-        if (!card) return;
-        draggingEl = card;
-        card.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", card.dataset.uid || "");
-      });
-
-      container.addEventListener("dragend", () => {
-        if (draggingEl) draggingEl.classList.remove("dragging");
-        draggingEl = null;
-        container.querySelectorAll(".dropTarget").forEach(x => x.classList.remove("dropTarget"));
-        updateMergeSummary();
-      });
-
-      container.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        const afterEl = getDragAfterElement(container, e.clientY);
-        const dragging = container.querySelector(".dragging");
-        if (!dragging) return;
-
-        container.querySelectorAll(".dropTarget").forEach(x => x.classList.remove("dropTarget"));
-        if (afterEl) afterEl.classList.add("dropTarget");
-
-        if (afterEl == null) container.appendChild(dragging);
-        else container.insertBefore(dragging, afterEl);
-      });
-
-      container.addEventListener("drop", (e) => {
-        e.preventDefault();
-        container.querySelectorAll(".dropTarget").forEach(x => x.classList.remove("dropTarget"));
-        updateMergeSummary();
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
       });
     }
 
-    function getMergeSelectedCards(){
-      const container = $("#mergePages");
-      const cards = Array.from(container.children).filter(el => el.classList.contains("pageCard"));
-      const selected = [];
-      for (const card of cards){
-        const uid = card.dataset.uid;
-        const ui = mergeState.uiByUid.get(uid);
-        if (ui && ui.checkbox.checked) selected.push(card);
-      }
-      return selected;
+    async function putJob(job){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).put(job);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
     }
 
-    function updateMergeSummary(){
-      const total = mergeState.uiByUid.size;
-      let selected = 0;
-      for (const { checkbox } of mergeState.uiByUid.values()){
-        if (checkbox.checked) selected++;
-      }
-      if (total > 0) setStatus($("#mergeStatus2"), `현재 선택(포함): ${selected}/${total} 페이지`);
+    async function getJob(jobId){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readonly");
+        const req = tx.objectStore(STORE).get(jobId);
+        req.onsuccess = () => { db.close(); resolve(req.result || null); };
+        req.onerror = () => { db.close(); reject(req.error); };
+      });
     }
 
-    // ---- Multi-move utilities (DOM-based, keeps relative order of selected) ----
-    function moveSelectedToFirst(){
-      const container = $("#mergePages");
-      const selected = getMergeSelectedCards();
-      if (selected.length === 0) return false;
-
-      // Preserve current relative order
-      selected.forEach(card => container.insertBefore(card, container.firstChild));
-      return true;
+    function newJobId(){
+      return "job_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
     }
 
-    function moveSelectedToLast(){
-      const container = $("#mergePages");
-      const selected = getMergeSelectedCards();
-      if (selected.length === 0) return false;
-
-      selected.forEach(card => container.appendChild(card));
-      return true;
+    async function createOrLoadJob(jobId){
+      let job = await getJob(jobId);
+      if (!job){
+        job = { jobId, createdAt: Date.now(), files: [] };
+        await putJob(job);
+      }
+      return job;
     }
 
-    function moveSelectedUpOne(){
-      const container = $("#mergePages");
-      const cards = Array.from(container.children).filter(el => el.classList.contains("pageCard"));
-      const isSelected = new Set(getMergeSelectedCards());
-
-      if (isSelected.size === 0) return false;
-
-      // Left shift: iterate from start
-      for (let i=0; i<cards.length; i++){
-        const card = cards[i];
-        if (!isSelected.has(card)) continue;
-
-        const prev = card.previousElementSibling;
-        if (prev && !isSelected.has(prev)){
-          container.insertBefore(card, prev);
-        }
+    async function addFilesToJob(jobId, fileList){
+      const job = await createOrLoadJob(jobId);
+      const files = Array.from(fileList || []);
+      for (const f of files){
+        const bytes = await f.arrayBuffer();
+        job.files.push({
+          id: "f_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7),
+          name: f.name,
+          type: f.type || "application/pdf",
+          bytes
+        });
       }
-      return true;
+      await putJob(job);
+      return job;
     }
 
-    function moveSelectedDownOne(){
-      const container = $("#mergePages");
-      const cards = Array.from(container.children).filter(el => el.classList.contains("pageCard"));
-      const isSelected = new Set(getMergeSelectedCards());
-
-      if (isSelected.size === 0) return false;
-
-      // Right shift: iterate from end
-      for (let i=cards.length-1; i>=0; i--){
-        const card = cards[i];
-        if (!isSelected.has(card)) continue;
-
-        const next = card.nextElementSibling;
-        if (next && !isSelected.has(next)){
-          container.insertBefore(next, card); // swap by moving next before card
-        }
-      }
-      return true;
+    async function clearJob(jobId){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).delete(jobId);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
     }
 
-    function deleteSelectedPages(){
-      const container = $("#mergePages");
-      const selected = getMergeSelectedCards();
-      if (selected.length === 0) return false;
+    // ========= UI logic =========
+    const dz = document.getElementById("dropzone");
+    const fileInput = document.getElementById("fileInput");
+    const pickBtn = document.getElementById("pickBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const status = document.getElementById("status");
+    const goMerge = document.getElementById("goMerge");
+    const goSplit = document.getElementById("goSplit");
 
-      for (const card of selected){
-        const uid = card.dataset.uid;
-        card.remove();
-        // cleanup maps
-        mergeState.uiByUid.delete(uid);
-        mergeState.itemByUid.delete(uid);
-      }
-      return true;
+    let currentJobId = newJobId();
+    let fileCount = 0;
+
+    function setStatus(msg){ status.textContent = msg || ""; }
+    function setEnabled(el, enabled){
+      el.classList.toggle("disabled", !enabled);
+    }
+    function refresh(){
+      const ok = fileCount > 0;
+      setEnabled(goMerge, ok);
+      setEnabled(goSplit, ok);
+      setStatus(ok ? `준비됨: ${fileCount}개 파일 (jobId=${currentJobId})` : "파일을 추가하세요.");
     }
 
-    // Wire move/delete buttons
-    $("#mergeMoveFirst").addEventListener("click", () => {
-      if (!moveSelectedToFirst()) setStatus($("#mergeStatus2"), "선택(포함)된 페이지가 없습니다.");
-      else updateMergeSummary();
-    });
-    $("#mergeMoveLast").addEventListener("click", () => {
-      if (!moveSelectedToLast()) setStatus($("#mergeStatus2"), "선택(포함)된 페이지가 없습니다.");
-      else updateMergeSummary();
-    });
-    $("#mergeMoveUp").addEventListener("click", () => {
-      if (!moveSelectedUpOne()) setStatus($("#mergeStatus2"), "선택(포함)된 페이지가 없습니다.");
-      else updateMergeSummary();
-    });
-    $("#mergeMoveDown").addEventListener("click", () => {
-      if (!moveSelectedDownOne()) setStatus($("#mergeStatus2"), "선택(포함)된 페이지가 없습니다.");
-      else updateMergeSummary();
-    });
-    $("#mergeDeleteSelected").addEventListener("click", () => {
-      if (!deleteSelectedPages()){
-        setStatus($("#mergeStatus2"), "선택(포함)된 페이지가 없습니다.");
-        return;
-      }
-      updateMergeSummary();
-    });
-
-    mergeNextBtn.addEventListener("click", async () => {
-      const files = Array.from(mergeFilesEl.files || []);
-      if (files.length < 2) return;
-
-      mergeNextBtn.disabled = true;
-      setStatus(mergeStatus, "업로드 파일 로딩 중...");
-
-      try {
-        mergeState.files = files;
-        mergeState.pdfDocs = [];
-        mergeState.pdfBytes = [];
-        mergeState.itemByUid.clear();
-        mergeState.uiByUid.clear();
-
-        $("#mergePages").innerHTML = "";
-
-        for (let i=0; i<files.length; i++){
-          const f = files[i];
-          setStatus(mergeStatus, `로딩 중... (${i+1}/${files.length}) ${f.name}`);
-          const bytes = await f.arrayBuffer();
-          mergeState.pdfBytes.push(bytes);
-
-          const pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
-          mergeState.pdfDocs.push(pdfDoc);
-        }
-
-        $("#merge-step1").classList.add("hidden");
-        $("#merge-step2").classList.remove("hidden");
-
-        const container = $("#mergePages");
-        enableDnDForContainer(container);
-
-        let totalPages = 0;
-        for (const doc of mergeState.pdfDocs) totalPages += doc.numPages;
-        $("#mergeMeta").textContent = `총 ${mergeState.files.length}개 파일, 전체 페이지 ${totalPages}개`;
-        setStatus($("#mergeStatus2"), "페이지 미리보기 생성 중...");
-
-        let globalIdx = 0;
-        for (let fileIndex=0; fileIndex<mergeState.pdfDocs.length; fileIndex++){
-          const pdfDoc = mergeState.pdfDocs[fileIndex];
-          const fileName = mergeState.files[fileIndex].name;
-
-          for (let p=1; p<=pdfDoc.numPages; p++){
-            globalIdx++;
-            const uid = `m-${fileIndex}-${p}-${globalIdx}`;
-
-            const item = { fileIndex, pageNumber1: p, fileName };
-            mergeState.itemByUid.set(uid, item);
-
-            const { card, checkbox, canvas } = createPageCard({
-              titleName: fileName,
-              labelNumber: `p.${p}`,
-              checked: true,
-              draggable: true,
-              uid
-            });
-
-            // update summary on checkbox change
-            checkbox.addEventListener("change", updateMergeSummary);
-
-            container.appendChild(card);
-            mergeState.uiByUid.set(uid, { checkbox, card });
-
-            await renderPageThumb(pdfDoc, p, canvas, 0.35);
-
-            if (globalIdx % 10 === 0) setStatus($("#mergeStatus2"), `페이지 미리보기 생성 중... (${globalIdx}/${totalPages})`);
-          }
-        }
-
-        updateMergeSummary();
-      } catch (e){
-        console.error(e);
-        setStatus(mergeStatus, `오류: ${e.message || e}`);
-      } finally {
-        mergeNextBtn.disabled = false;
-      }
-    });
-
-    $("#mergeDownloadBtn").addEventListener("click", async () => {
-      const container = $("#mergePages");
-
-      const orderedUids = Array.from(container.children)
-        .map(el => el.dataset.uid)
-        .filter(Boolean);
-
-      const selectedItems = [];
-      for (const uid of orderedUids){
-        const ui = mergeState.uiByUid.get(uid);
-        if (!ui) continue;
-        if (!ui.checkbox.checked) continue;
-
-        const item = mergeState.itemByUid.get(uid);
-        if (item) selectedItems.push(item);
-      }
-
-      if (selectedItems.length === 0){
-        setStatus($("#mergeStatus2"), "선택(포함)된 페이지가 없습니다. 최소 1페이지 이상 선택하세요.");
-        return;
-      }
-
-      $("#mergeDownloadBtn").disabled = true;
-      setStatus($("#mergeStatus2"), `병합 중... (선택 ${selectedItems.length}페이지)`);
-
-      try {
-        const mergedPdf = await PDFLib.PDFDocument.create();
-        const pdfLibDocs = new Map(); // fileIndex -> pdf-lib doc
-
-        for (let i=0; i<selectedItems.length; i++){
-          const s = selectedItems[i];
-
-          if (!pdfLibDocs.has(s.fileIndex)){
-            const buf = mergeState.pdfBytes[s.fileIndex];
-            const doc = await PDFLib.PDFDocument.load(buf);
-            pdfLibDocs.set(s.fileIndex, doc);
-          }
-          const src = pdfLibDocs.get(s.fileIndex);
-
-          const pageIdx0 = s.pageNumber1 - 1;
-          const [copied] = await mergedPdf.copyPages(src, [pageIdx0]);
-          mergedPdf.addPage(copied);
-
-          if ((i+1) % 20 === 0) setStatus($("#mergeStatus2"), `병합 중... (${i+1}/${selectedItems.length})`);
-        }
-
-        const outBytes = await mergedPdf.save();
-        const blob = new Blob([outBytes], { type: "application/pdf" });
-        const filename = `merged_${new Date().toISOString().slice(0,10)}.pdf`;
-        downloadBlob(blob, filename);
-
-        setStatus($("#mergeStatus2"), `완료: ${filename}`);
-      } catch (e){
-        console.error(e);
-        setStatus($("#mergeStatus2"), `오류: ${e.message || e}`);
-      } finally {
-        $("#mergeDownloadBtn").disabled = false;
-      }
-    });
-
-    // =========================
-    // SPLIT (unchanged)
-    // =========================
-    const splitState = {
-      file: null,
-      pdfDocJs: null,
-      pdfBytes: null,
-      ui: []
-    };
-
-    const splitFileEl = $("#splitFile");
-    const splitModeEl = $("#splitMode");
-    const splitNextBtn = $("#splitNextBtn");
-    const splitClearBtn = $("#splitClearBtn");
-    const splitStatus = $("#splitStatus");
-
-    function refreshSplitNext(){
-      splitNextBtn.disabled = !(splitFileEl.files && splitFileEl.files.length === 1);
-      const f = splitFileEl.files && splitFileEl.files[0];
-      setStatus(splitStatus, f ? `선택됨: ${f.name}` : "");
+    async function handleFiles(files){
+      if (!files || files.length === 0) return;
+      setStatus("파일 저장 중(IndexedDB)...");
+      const job = await addFilesToJob(currentJobId, files);
+      fileCount = job.files.length;
+      refresh();
     }
-    splitFileEl.addEventListener("change", refreshSplitNext);
 
-    splitClearBtn.addEventListener("click", () => {
-      splitFileEl.value = "";
-      splitNextBtn.disabled = true;
-      setStatus(splitStatus, "");
+    dz.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dz.classList.add("dragover");
+    });
+    dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+    dz.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      dz.classList.remove("dragover");
+      await handleFiles(e.dataTransfer.files);
+    });
+    dz.addEventListener("click", () => fileInput.click());
+    dz.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") fileInput.click(); });
+
+    pickBtn.addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
+    fileInput.addEventListener("change", async () => {
+      await handleFiles(fileInput.files);
+      fileInput.value = "";
     });
 
-    $("#splitBackBtn").addEventListener("click", () => {
-      $("#split-step2").classList.add("hidden");
-      $("#split-step1").classList.remove("hidden");
-      $("#splitPages").innerHTML = "";
-      splitState.file = null;
-      splitState.pdfDocJs = null;
-      splitState.pdfBytes = null;
-      splitState.ui = [];
-      setStatus($("#splitStatus2"), "");
+    clearBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await clearJob(currentJobId);
+      currentJobId = newJobId();
+      fileCount = 0;
+      refresh();
     });
 
-    $("#splitSelectAll").addEventListener("click", () => splitState.ui.forEach(x => x.checkbox.checked = true));
-    $("#splitSelectNone").addEventListener("click", () => splitState.ui.forEach(x => x.checkbox.checked = false));
+    function go(page){
+      // jobId 전달
+      location.href = `${page}?jobId=${encodeURIComponent(currentJobId)}`;
+    }
+    goMerge.addEventListener("click", () => { if (fileCount>0) go("merge.html"); });
+    goSplit.addEventListener("click", () => { if (fileCount>0) go("split.html"); });
 
-    splitNextBtn.addEventListener("click", async () => {
-      const file = splitFileEl.files && splitFileEl.files[0];
-      if (!file) return;
-
-      splitNextBtn.disabled = true;
-      setStatus(splitStatus, "업로드 파일 로딩 중...");
-
-      try {
-        $("#splitPages").innerHTML = "";
-        splitState.file = file;
-        splitState.ui = [];
-
-        const bytes = await file.arrayBuffer();
-        splitState.pdfBytes = bytes;
-
-        const pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
-        splitState.pdfDocJs = pdfDoc;
-
-        $("#split-step1").classList.add("hidden");
-        $("#split-step2").classList.remove("hidden");
-
-        $("#splitMeta").textContent =
-          `${file.name} · 총 ${pdfDoc.numPages}페이지 · 모드: ${splitModeEl.options[splitModeEl.selectedIndex].text}`;
-
-        setStatus($("#splitStatus2"), "페이지 미리보기 생성 중...");
-        const container = $("#splitPages");
-
-        for (let p=1; p<=pdfDoc.numPages; p++){
-          const { card, checkbox, canvas } = createPageCard({
-            titleName: file.name,
-            labelNumber: `p.${p}`,
-            checked: true,
-            draggable: false
-          });
-          container.appendChild(card);
-          splitState.ui.push({ checkbox, pageNumber1: p });
-
-          await renderPageThumb(pdfDoc, p, canvas, 0.35);
-          if (p % 10 === 0) setStatus($("#splitStatus2"), `페이지 미리보기 생성 중... (${p}/${pdfDoc.numPages})`);
-        }
-
-        setStatus($("#splitStatus2"), "완료. 추출할 페이지를 체크한 후 다운로드하세요.");
-      } catch (e){
-        console.error(e);
-        setStatus(splitStatus, `오류: ${e.message || e}`);
-      } finally {
-        splitNextBtn.disabled = false;
-      }
-    });
-
-    $("#splitDownloadBtn").addEventListener("click", async () => {
-      const selectedPages = splitState.ui.filter(x => x.checkbox.checked).map(x => x.pageNumber1);
-      if (!splitState.file || !splitState.pdfBytes){
-        setStatus($("#splitStatus2"), "오류: 파일 상태가 올바르지 않습니다. 업로드로 돌아가 다시 시도하세요.");
-        return;
-      }
-      if (selectedPages.length === 0){
-        setStatus($("#splitStatus2"), "선택된 페이지가 없습니다. 최소 1페이지 이상 선택하세요.");
-        return;
-      }
-
-      const mode = splitModeEl.value;
-      $("#splitDownloadBtn").disabled = true;
-      setStatus($("#splitStatus2"), `처리 중... (선택 ${selectedPages.length}페이지)`);
-
-      try {
-        const baseName = toValidFilename(splitState.file.name.replace(/\.pdf$/i, "")) || "pdf";
-        const srcPdf = await PDFLib.PDFDocument.load(splitState.pdfBytes);
-
-        if (mode === "extract"){
-          const outPdf = await PDFLib.PDFDocument.create();
-          const indices0 = selectedPages.map(p => p - 1);
-          const copied = await outPdf.copyPages(srcPdf, indices0);
-          copied.forEach(pg => outPdf.addPage(pg));
-
-          const outBytes = await outPdf.save();
-          const blob = new Blob([outBytes], { type: "application/pdf" });
-          const filename = `${baseName}_extract_${new Date().toISOString().slice(0,10)}.pdf`;
-          downloadBlob(blob, filename);
-          setStatus($("#splitStatus2"), `완료: ${filename}`);
-          return;
-        }
-
-        if (mode === "eachzip"){
-          const zip = new JSZip();
-
-          for (let i=0; i<selectedPages.length; i++){
-            const p1 = selectedPages[i];
-            const outPdf = await PDFLib.PDFDocument.create();
-            const [copied] = await outPdf.copyPages(srcPdf, [p1 - 1]);
-            outPdf.addPage(copied);
-
-            const outBytes = await outPdf.save();
-            zip.file(`${baseName}_p${String(p1).padStart(3, "0")}.pdf`, outBytes);
-
-            if ((i+1) % 20 === 0){
-              setStatus($("#splitStatus2"), `개별 PDF 생성 중... (${i+1}/${selectedPages.length})`);
-            }
-          }
-
-          setStatus($("#splitStatus2"), "ZIP 생성 중...");
-          const zipBlob = await zip.generateAsync({ type: "blob" });
-          const zipName = `${baseName}_split_${new Date().toISOString().slice(0,10)}.zip`;
-          downloadBlob(zipBlob, zipName);
-          setStatus($("#splitStatus2"), `완료: ${zipName}`);
-          return;
-        }
-      } catch (e){
-        console.error(e);
-        setStatus($("#splitStatus2"), `오류: ${e.message || e}`);
-      } finally {
-        $("#splitDownloadBtn").disabled = false;
-      }
-    });
-
-    // init
-    showTab("merge");
-    refreshSplitNext();
+    refresh();
   </script>
 </body>
 </html>

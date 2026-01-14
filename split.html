@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChangePDF - 분할</title>
+  <style>
+    :root{
+      --bg:#fff; --text:#0f172a; --muted:#64748b; --line:#e5e7eb;
+      --primary:#2563eb; --primaryHover:#1d4ed8;
+      --danger:#dc2626; --dangerHover:#b91c1c;
+      --shadow:0 16px 32px rgba(15,23,42,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1150px;margin:0 auto;padding:26px 16px 80px}
+    header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    h1{margin:0;font-size:20px}
+    .sub{margin:6px 0 0;color:var(--muted);line-height:1.5}
+    .card{margin-top:16px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:16px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .btn{border:none;cursor:pointer;border-radius:14px;padding:10px 12px;font-weight:900;transition:.15s}
+    .btn.primary{background:var(--primary);color:#fff}
+    .btn.primary:hover{background:var(--primaryHover)}
+    .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--text)}
+    .btn.ghost:hover{border-color:#cbd5e1}
+    .btn.danger{background:var(--danger);color:#fff}
+    .btn.danger:hover{background:var(--dangerHover)}
+    .meta{color:var(--muted);font-size:13px;white-space:pre-wrap;margin-top:10px}
+    input[type="file"]{display:none}
+
+    select{
+      padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--text);
+    }
+
+    .toolbar{
+      display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;
+      padding:10px;border:1px dashed #cbd5e1;background:#f8fafc;border-radius:16px;margin-top:12px;
+    }
+    .group{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .group strong{font-size:13px}
+    .mini{border:1px solid var(--line);background:#fff;color:var(--text);padding:8px 10px;border-radius:12px;cursor:pointer;font-weight:800}
+    .mini:hover{border-color:#cbd5e1}
+
+    .pages{
+      display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:12px;
+    }
+    @media (max-width:1100px){.pages{grid-template-columns:repeat(4,minmax(0,1fr));}}
+    @media (max-width:900px){.pages{grid-template-columns:repeat(3,minmax(0,1fr));}}
+    @media (max-width:650px){.pages{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+    .pageCard{border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden;user-select:none;transition:.12s}
+    .pageCard:hover{border-color:#cbd5e1;transform:translateY(-1px)}
+    .top{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 10px 8px;border-bottom:1px solid var(--line)}
+    .info{min-width:0}
+    .name{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+    .num{font-size:13px;font-weight:950}
+    .check{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+    .check input{width:16px;height:16px}
+    .canvasWrap{padding:10px;background:#f8fafc}
+    canvas{width:100%;height:auto;display:block;border-radius:10px;background:#fff}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>PDF 분할</h1>
+        <p class="sub">대상 PDF(첫 번째 파일)를 미리보고 선택 후 “완료”를 누르면 분할 결과를 다운로드합니다.</p>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="backHome">처음으로</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="row">
+        <button class="btn primary" id="addFilesBtn">파일 추가</button>
+        <button class="btn ghost" id="reloadBtn">미리보기 새로고침</button>
+        <button class="btn danger" id="clearJobBtn">이 작업 비우기</button>
+        <input id="addFilesInput" type="file" accept="application/pdf" multiple />
+      </div>
+
+      <div class="toolbar">
+        <div class="group">
+          <strong>분할 방식</strong>
+          <select id="mode">
+            <option value="extract">선택 페이지 추출 → 1개 PDF</option>
+            <option value="eachzip">선택 페이지를 개별 PDF → ZIP</option>
+          </select>
+        </div>
+        <div class="group">
+          <strong>선택</strong>
+          <button class="mini" id="selectAll">전체 선택</button>
+          <button class="mini" id="selectNone">전체 해제</button>
+        </div>
+        <div class="group">
+          <strong>완료</strong>
+          <button class="btn primary" id="doneBtn">분할 다운로드</button>
+        </div>
+      </div>
+
+      <div id="meta" class="meta"></div>
+      <div id="pages" class="pages"></div>
+      <div id="status" class="meta"></div>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.js"></script>
+
+  <script>
+    // ===== Shared IndexedDB helper =====
+    const DB_NAME = "changePDF";
+    const DB_VERSION = 1;
+    const STORE = "jobs";
+
+    function openDB(){
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "jobId" });
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function getJob(jobId){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readonly");
+        const req = tx.objectStore(STORE).get(jobId);
+        req.onsuccess = () => { db.close(); resolve(req.result || null); };
+        req.onerror = () => { db.close(); reject(req.error); };
+      });
+    }
+    async function putJob(job){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).put(job);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    }
+    async function addFilesToJob(jobId, fileList){
+      const job = (await getJob(jobId)) || { jobId, createdAt: Date.now(), files: [] };
+      const files = Array.from(fileList || []);
+      for (const f of files){
+        const bytes = await f.arrayBuffer();
+        job.files.push({
+          id: "f_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7),
+          name: f.name,
+          type: f.type || "application/pdf",
+          bytes
+        });
+      }
+      await putJob(job);
+      return job;
+    }
+    async function clearJob(jobId){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).delete(jobId);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    }
+
+    // ===== PDF.js worker =====
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.js";
+
+    const $ = (s) => document.querySelector(s);
+    const pagesEl = $("#pages");
+    const metaEl = $("#meta");
+    const statusEl = $("#status");
+
+    function setStatus(msg){ statusEl.textContent = msg || ""; }
+    function setMeta(msg){ metaEl.textContent = msg || ""; }
+
+    function qs(name){
+      const u = new URL(location.href);
+      return u.searchParams.get(name);
+    }
+    const jobId = qs("jobId");
+    if (!jobId) location.href = "index.html";
+
+    let targetFile = null; // first file in job
+    let pdfJsDoc = null;
+    let checkboxes = []; // index => checkbox (pageNumber1-1)
+
+    function createCard(fileName, pageNumber1){
+      const card = document.createElement("div");
+      card.className = "pageCard";
+
+      const top = document.createElement("div");
+      top.className = "top";
+
+      const info = document.createElement("div");
+      info.className = "info";
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = fileName;
+      const num = document.createElement("div");
+      num.className = "num";
+      num.textContent = "p." + pageNumber1;
+      info.appendChild(name);
+      info.appendChild(num);
+
+      const check = document.createElement("label");
+      check.className = "check";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = true;
+      const span = document.createElement("span");
+      span.textContent = "선택";
+      check.appendChild(cb);
+      check.appendChild(span);
+
+      top.appendChild(info);
+      top.appendChild(check);
+
+      const canvasWrap = document.createElement("div");
+      canvasWrap.className = "canvasWrap";
+      const canvas = document.createElement("canvas");
+      canvasWrap.appendChild(canvas);
+
+      card.appendChild(top);
+      card.appendChild(canvasWrap);
+
+      card.addEventListener("click", (e) => {
+        if (e.target === cb) return;
+        cb.checked = !cb.checked;
+        updateMeta();
+      });
+      cb.addEventListener("change", updateMeta);
+
+      return { card, canvas, cb };
+    }
+
+    async function renderThumb(pageNumber1, canvas, scale=0.35){
+      const page = await pdfJsDoc.getPage(pageNumber1);
+      const viewport = page.getViewport({ scale });
+      const ctx = canvas.getContext("2d", { alpha:false });
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+    }
+
+    function updateMeta(){
+      if (!targetFile || !pdfJsDoc) return;
+      const total = pdfJsDoc.numPages;
+      const selected = checkboxes.filter(cb => cb && cb.checked).length;
+      setMeta(`jobId=${jobId} | 대상 파일: ${targetFile.name} | 페이지 ${total}개 | 선택 ${selected}개 | 모드: ${$("#mode").value}`);
+    }
+
+    async function loadAndRender(){
+      setStatus("작업 로딩 중...");
+      pagesEl.innerHTML = "";
+      checkboxes = [];
+      targetFile = null;
+      pdfJsDoc = null;
+
+      const job = await getJob(jobId);
+      if (!job || !job.files || job.files.length === 0){
+        setStatus("파일이 없습니다. 처음 페이지로 돌아가 파일을 추가하세요.");
+        setMeta(`jobId=${jobId}`);
+        return;
+      }
+
+      // Use first file as split target
+      targetFile = job.files[0];
+      pdfJsDoc = await pdfjsLib.getDocument({ data: targetFile.bytes }).promise;
+
+      setStatus("페이지 미리보기 생성 중...");
+      for (let p=1; p<=pdfJsDoc.numPages; p++){
+        const { card, canvas, cb } = createCard(targetFile.name, p);
+        pagesEl.appendChild(card);
+        checkboxes[p-1] = cb;
+
+        await renderThumb(p, canvas, 0.35);
+        if (p % 12 === 0) setStatus(`페이지 미리보기 생성 중... (${p}/${pdfJsDoc.numPages})`);
+      }
+
+      updateMeta();
+      setStatus("완료. 페이지 선택 후 분할 다운로드를 누르세요.");
+    }
+
+    async function splitAndDownload(){
+      if (!targetFile) { setStatus("대상 파일이 없습니다."); return; }
+      const pagesSelected = [];
+      for (let i=0; i<checkboxes.length; i++){
+        if (checkboxes[i] && checkboxes[i].checked) pagesSelected.push(i+1); // 1-based
+      }
+      if (pagesSelected.length === 0){ setStatus("선택된 페이지가 없습니다."); return; }
+
+      const mode = $("#mode").value;
+      const baseName = (targetFile.name || "pdf").replace(/\.pdf$/i, "").replace(/[\\/:*?"<>|]/g, "_").trim() || "pdf";
+
+      const srcPdf = await PDFLib.PDFDocument.load(targetFile.bytes);
+
+      if (mode === "extract"){
+        setStatus("추출 PDF 생성 중...");
+        const outPdf = await PDFLib.PDFDocument.create();
+        const indices0 = pagesSelected.map(p => p-1);
+        const copied = await outPdf.copyPages(srcPdf, indices0);
+        copied.forEach(pg => outPdf.addPage(pg));
+        const outBytes = await outPdf.save();
+        const blob = new Blob([outBytes], { type:"application/pdf" });
+
+        const filename = `${baseName}_extract_${new Date().toISOString().slice(0,10)}.pdf`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        setStatus(`완료: ${filename}`);
+        return;
+      }
+
+      if (mode === "eachzip"){
+        setStatus("개별 PDF 생성 중...");
+        const zip = new JSZip();
+        for (let i=0; i<pagesSelected.length; i++){
+          const p1 = pagesSelected[i];
+          const outPdf = await PDFLib.PDFDocument.create();
+          const [copied] = await outPdf.copyPages(srcPdf, [p1-1]);
+          outPdf.addPage(copied);
+          const outBytes = await outPdf.save();
+          zip.file(`${baseName}_p${String(p1).padStart(3,"0")}.pdf`, outBytes);
+          if ((i+1) % 20 === 0) setStatus(`개별 PDF 생성 중... (${i+1}/${pagesSelected.length})`);
+        }
+        setStatus("ZIP 생성 중...");
+        const zipBlob = await zip.generateAsync({ type:"blob" });
+        const zipName = `${baseName}_split_${new Date().toISOString().slice(0,10)}.zip`;
+        const url = URL.createObjectURL(zipBlob);
+        const a = document.createElement("a");
+        a.href = url; a.download = zipName;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        setStatus(`완료: ${zipName}`);
+        return;
+      }
+    }
+
+    // Events
+    $("#backHome").addEventListener("click", () => location.href = "index.html");
+    $("#reloadBtn").addEventListener("click", loadAndRender);
+    $("#mode").addEventListener("change", updateMeta);
+
+    $("#addFilesBtn").addEventListener("click", () => $("#addFilesInput").click());
+    $("#addFilesInput").addEventListener("change", async () => {
+      if (!$("#addFilesInput").files || $("#addFilesInput").files.length === 0) return;
+      setStatus("파일 추가 저장 중...");
+      await addFilesToJob(jobId, $("#addFilesInput").files);
+      $("#addFilesInput").value = "";
+      await loadAndRender();
+    });
+
+    $("#clearJobBtn").addEventListener("click", async () => {
+      await clearJob(jobId);
+      pagesEl.innerHTML = "";
+      checkboxes = [];
+      setMeta(`jobId=${jobId} | 비어있음`);
+      setStatus("이 작업(jobId)을 비웠습니다. 처음으로 돌아가 파일을 추가하세요.");
+    });
+
+    $("#selectAll").addEventListener("click", () => { checkboxes.forEach(cb => cb && (cb.checked=true)); updateMeta(); });
+    $("#selectNone").addEventListener("click", () => { checkboxes.forEach(cb => cb && (cb.checked=false)); updateMeta(); });
+
+    $("#doneBtn").addEventListener("click", async () => {
+      $("#doneBtn").disabled = true;
+      try{
+        await splitAndDownload();
+      } catch(e){
+        console.error(e);
+        setStatus("오류: " + (e.message || e));
+      } finally {
+        $("#doneBtn").disabled = false;
+      }
+    });
+
+    // init
+    loadAndRender();
+  </script>
+</body>
+</html>
