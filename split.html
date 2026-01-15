@@ -31,10 +31,8 @@
 
     input[type="file"]{display:none}
     select{padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--text)}
-
     .meta{color:var(--muted);font-size:13px;white-space:pre-wrap;margin-top:10px}
 
-    /* Toolbar */
     .toolbar{
       display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;
       padding:10px;border:1px dashed #cbd5e1;background:#f8fafc;border-radius:16px;margin-top:12px;
@@ -49,7 +47,6 @@
     .mini.danger{border-color:rgba(220,38,38,.35);color:#991b1b}
     .mini.danger:hover{background:#fef2f2}
 
-    /* Drop zone (optional, matches merge) */
     .dz{
       margin-top:12px;border:2px dashed #cbd5e1;background:#f8fafc;border-radius:18px;
       padding:18px;transition:.15s ease;
@@ -58,7 +55,6 @@
     .dzTitle{margin:0;font-weight:950}
     .dzDesc{margin:6px 0 0;color:var(--muted);line-height:1.5;font-size:13px}
 
-    /* Pages grid */
     .pages{
       display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:12px;
     }
@@ -89,9 +85,7 @@
     .name{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
     .num{font-size:13px;font-weight:950}
     .actions{display:flex;gap:8px;align-items:center}
-    .chk{
-      display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);
-    }
+    .chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
     .chk input{width:16px;height:16px}
     .delBtn{
       border:none;background:#f1f5f9;color:#0f172a;border-radius:12px;
@@ -115,7 +109,7 @@
       <div>
         <h1>PDF 분할(정리)</h1>
         <p class="sub">
-          페이지를 선택(체크)한 뒤 “선택 삭제”로 제거하거나, 페이지별 삭제를 사용할 수 있습니다.
+          페이지를 체크해 선택한 뒤 “선택 삭제”로 제거하거나, 페이지별 삭제를 사용할 수 있습니다.
           완료를 누르면 남아있는 페이지 기준으로 다운로드됩니다.
         </p>
       </div>
@@ -172,7 +166,9 @@
 
   <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.js"></script>
+
+  <!-- ✅ merge와 동일: pdf.js legacy -->
+  <script src="https://unpkg.com/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
 
   <script>
     // ===== IndexedDB helper =====
@@ -191,6 +187,7 @@
         req.onerror = () => reject(req.error);
       });
     }
+
     async function getJob(jobId){
       const db = await openDB();
       return new Promise((resolve, reject) => {
@@ -200,6 +197,7 @@
         req.onerror = () => { db.close(); reject(req.error); };
       });
     }
+
     async function putJob(job){
       const db = await openDB();
       return new Promise((resolve, reject) => {
@@ -209,8 +207,18 @@
         tx.onerror = () => { db.close(); reject(tx.error); };
       });
     }
+
+    async function ensureJob(jobId){
+      let job = await getJob(jobId);
+      if (!job){
+        job = { jobId, createdAt: Date.now(), files: [] };
+        await putJob(job);
+      }
+      return job;
+    }
+
     async function addFilesToJob(jobId, fileList){
-      const job = (await getJob(jobId)) || { jobId, createdAt: Date.now(), files: [] };
+      const job = await ensureJob(jobId);
       const files = Array.from(fileList || []);
       for (const f of files){
         if ((f.type && f.type !== "application/pdf") && !f.name.toLowerCase().endsWith(".pdf")) continue;
@@ -225,6 +233,7 @@
       await putJob(job);
       return job;
     }
+
     async function clearJob(jobId){
       const db = await openDB();
       return new Promise((resolve, reject) => {
@@ -235,9 +244,9 @@
       });
     }
 
-    // ===== PDF.js worker =====
+    // ===== PDF.js worker (merge와 동일) =====
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.js";
+      "https://unpkg.com/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js";
 
     // ===== UI helpers =====
     const $ = (s) => document.querySelector(s);
@@ -254,16 +263,17 @@
       const u = new URL(location.href);
       return u.searchParams.get(name);
     }
+
     const jobId = qs("jobId");
     if (!jobId) location.href = "index.html";
 
     // ===== State =====
     let job = null;
-    let targetFile = null;   // first file in job
-    let pdfDoc = null;       // pdf.js doc
-    let keptPages = [];      // array of pageNumber1 that are "kept" (not deleted)
-    let selected = new Set();// selected pages (pageNumber1) for multi-delete
-    const canvasByPage = new Map(); // pageNumber1 -> canvas (optional)
+    let targetFile = null;        // 첫 번째 파일
+    let pdfDoc = null;            // pdf.js doc
+    let keptPages = [];           // 남길 페이지 목록(1-based)
+    let selected = new Set();     // 선택(삭제 대상) 페이지(1-based)
+    const canvasByPage = new Map();
 
     function baseNameFromFile(name){
       return (name || "pdf")
@@ -283,8 +293,9 @@
 
     function updateHeaderInfo(){
       if (!targetFile || !pdfDoc){
-        setMeta(`jobId=${jobId}`);
+        setMeta(`jobId=${jobId} | 파일을 추가하세요.`);
         setSummary("");
+        $("#doneBtn").disabled = true;
         return;
       }
       const total = pdfDoc.numPages;
@@ -292,10 +303,9 @@
       const sel = selected.size;
 
       setMeta(`jobId=${jobId} | 대상: ${targetFile.name} | 원본 ${total}p | 남김 ${kept}p | 선택 ${sel}p | 모드: ${$("#mode").value}`);
-      setSummary(kept === 0 ? "남아있는 페이지가 없습니다. 삭제를 되돌릴 수 없으므로 새로고침/재업로드가 필요합니다." : "");
+      setSummary(kept === 0 ? "남아있는 페이지가 없습니다. 새로고침/재업로드가 필요합니다." : "");
+      $("#doneBtn").disabled = (selected.size === 0);
     }
-
-    function isSelected(p1){ return selected.has(p1); }
 
     function toggleSelect(p1, on){
       if (on) selected.add(p1);
@@ -308,17 +318,16 @@
     function deletePages(pagesToDelete){
       const delSet = new Set(pagesToDelete);
       keptPages = keptPages.filter(p => !delSet.has(p));
-      // selected에서도 제거
       for (const p of delSet) selected.delete(p);
-      renderPages(); // 재렌더 (간단/확실)
+      renderPages(); // 재렌더
       setStatus(`삭제 완료: ${delSet.size}페이지`);
+      updateHeaderInfo();
     }
 
     function renderPages(){
       pagesEl.innerHTML = "";
       canvasByPage.clear();
 
-      // keptPages 순서대로 렌더
       for (const p1 of keptPages){
         const card = document.createElement("div");
         card.className = "pageCard";
@@ -345,7 +354,7 @@
         chk.className = "chk";
         const cb = document.createElement("input");
         cb.type = "checkbox";
-        cb.checked = isSelected(p1);
+        cb.checked = selected.has(p1);
         const span = document.createElement("span");
         span.textContent = "선택";
         chk.appendChild(cb);
@@ -374,7 +383,6 @@
         card.appendChild(top);
         card.appendChild(canvasWrap);
 
-        // 카드 클릭 시 체크 토글 (smallpdf 느낌)
         card.addEventListener("click", (e) => {
           if (e.target === cb || e.target === del) return;
           cb.checked = !cb.checked;
@@ -385,11 +393,9 @@
 
         pagesEl.appendChild(card);
         card.classList.toggle("selected", cb.checked);
-
         canvasByPage.set(p1, canvas);
       }
 
-      // 썸네일 렌더 (async)
       (async () => {
         let i = 0;
         for (const p1 of keptPages){
@@ -399,7 +405,7 @@
           i++;
           if (i % 12 === 0) setStatus(`미리보기 생성 중... (${i}/${keptPages.length})`);
         }
-        setStatus("완료. 선택 후 삭제하거나 다운로드하세요.");
+        setStatus(keptPages.length ? "완료. 선택 후 삭제하거나 다운로드하세요." : "남아있는 페이지가 없습니다.");
         updateHeaderInfo();
       })();
     }
@@ -408,16 +414,23 @@
       setStatus("작업 로딩 중...");
       pagesEl.innerHTML = "";
       selected.clear();
+      keptPages = [];
+      targetFile = null;
+      pdfDoc = null;
 
-      job = await getJob(jobId);
-      if (!job || !job.files || job.files.length === 0){
-        setStatus("파일이 없습니다. 처음으로 돌아가 파일을 추가하세요.");
-        setMeta(`jobId=${jobId}`);
+      job = await ensureJob(jobId);
+
+      if (!job.files || job.files.length === 0){
+        setStatus("파일이 없습니다. 위에서 파일을 추가하세요.");
+        updateHeaderInfo();
         return;
       }
 
-      targetFile = job.files[0]; // first pdf as target
-      pdfDoc = await pdfjsLib.getDocument({ data: targetFile.bytes }).promise;
+      targetFile = job.files[0];
+
+      // ✅ detached 방지: pdf.js에는 복사본 전달
+      const safeBytes = targetFile.bytes.slice(0);
+      pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(safeBytes) }).promise;
 
       keptPages = Array.from({ length: pdfDoc.numPages }, (_, i) => i + 1);
 
@@ -427,17 +440,23 @@
     }
 
     async function downloadResult(){
-      if (!targetFile) { setStatus("대상 파일이 없습니다."); return; }
-      if (keptPages.length === 0){ setStatus("남아있는 페이지가 없습니다."); return; }
+      if (!targetFile || !pdfDoc) { setStatus("대상 파일이 없습니다."); return; }
+      // ✅ 다운로드 대상: 선택된 페이지(체크)가 있으면 그걸 사용, 없으면 안내 후 중단(선택 강제)
+      const exportPages = Array.from(selected).sort((a,b) => a - b);
 
-      const mode = $("#mode").value;
+      if (exportPages.length === 0){
+        setStatus("다운로드할 페이지를 선택하세요.");
+        return;
+}
       const base = baseNameFromFile(targetFile.name);
-      const srcPdf = await PDFLib.PDFDocument.load(targetFile.bytes);
+
+      // ✅ detached 방지: pdf-lib에도 복사본 전달
+      const srcPdf = await PDFLib.PDFDocument.load(targetFile.bytes.slice(0));
 
       if (mode === "extract"){
         setStatus("PDF 생성 중...");
         const outPdf = await PDFLib.PDFDocument.create();
-        const indices0 = keptPages.map(p => p - 1);
+        const indices0 = exportPages.map(p => p - 1);
         const copied = await outPdf.copyPages(srcPdf, indices0);
         copied.forEach(pg => outPdf.addPage(pg));
         const outBytes = await outPdf.save();
@@ -457,15 +476,15 @@
         setStatus("개별 PDF 생성 중...");
         const zip = new JSZip();
 
-        for (let i=0; i<keptPages.length; i++){
-          const p1 = keptPages[i];
+        for (let i=0; i<exportPages.length; i++){
+          const p1 = exportPages[i];
           const outPdf = await PDFLib.PDFDocument.create();
           const [copied] = await outPdf.copyPages(srcPdf, [p1 - 1]);
           outPdf.addPage(copied);
           const outBytes = await outPdf.save();
           zip.file(`${base}_p${String(p1).padStart(3,"0")}.pdf`, outBytes);
 
-          if ((i+1) % 20 === 0) setStatus(`개별 PDF 생성 중... (${i+1}/${keptPages.length})`);
+          if ((i+1) % 20 === 0) setStatus(`개별 PDF 생성 중... (${i+1}/${exportPages.length})`);
         }
 
         setStatus("ZIP 생성 중...");
@@ -478,18 +497,16 @@
         URL.revokeObjectURL(url);
 
         setStatus(`완료: ${filename}`);
-        return;
       }
     }
 
     // ===== UI Events =====
     $("#backHome").addEventListener("click", () => location.href = "index.html");
-    $("#reloadBtn").addEventListener("click", loadAndInit);
+    $("#reloadBtn").addEventListener("click", () => loadAndInit().catch(e => { console.error(e); setStatus("오류: " + (e.message||e)); }));
     $("#mode").addEventListener("change", updateHeaderInfo);
 
     $("#selectAll").addEventListener("click", () => {
       selected = new Set(keptPages);
-      // UI 반영
       for (const p1 of keptPages){
         const cb = pagesEl.querySelector(`.pageCard[data-p="${p1}"] input[type="checkbox"]`);
         if (cb) cb.checked = true;
@@ -526,21 +543,26 @@
         console.error(e);
         setStatus("오류: " + (e.message || e));
       } finally {
-        $("#doneBtn").disabled = false;
+        updateHeaderInfo(); // keptPages 기준으로 disabled 재계산
       }
     });
 
-    // Add files (job에 추가 — split 대상은 여전히 첫 번째)
+    // Add files
     $("#addFilesBtn").addEventListener("click", () => $("#addFilesInput").click());
+
     $("#addFilesInput").addEventListener("change", async () => {
-      if (!$("#addFilesInput").files || $("#addFilesInput").files.length === 0) return;
-      setStatus("파일 추가 저장 중...");
-      await addFilesToJob(jobId, $("#addFilesInput").files);
-      $("#addFilesInput").value = "";
-      // split은 첫 파일이 대상이므로, 첫 파일이 바뀌지 않는 한 화면은 동일.
-      // 다만 사용자가 추가한 파일을 첫 대상으로 쓰고 싶을 수 있으니 새로 로드.
-      await loadAndInit();
-      setStatus("파일을 추가했습니다. (대상은 첫 번째 파일)");
+      try{
+        const files = $("#addFilesInput").files;
+        if (!files || files.length === 0) return;
+        setStatus("파일 추가 저장 중(IndexedDB)...");
+        await addFilesToJob(jobId, files);
+        $("#addFilesInput").value = "";
+        await loadAndInit();
+        setStatus("파일을 추가했습니다. (대상은 첫 번째 파일)");
+      } catch(e){
+        console.error(e);
+        setStatus("파일 추가 실패: " + (e?.message || e));
+      }
     });
 
     // Dropzone add
@@ -550,30 +572,44 @@
     dz.addEventListener("drop", async (e) => {
       e.preventDefault();
       dz.classList.remove("dragover");
-      const files = e.dataTransfer.files;
-      if (!files || files.length === 0) return;
-      setStatus("파일 추가 저장 중...");
-      await addFilesToJob(jobId, files);
-      await loadAndInit();
-      setStatus("파일을 추가했습니다. (대상은 첫 번째 파일)");
+      try{
+        const files = e.dataTransfer.files;
+        if (!files || files.length === 0) return;
+        setStatus("파일 추가 저장 중(IndexedDB)...");
+        await addFilesToJob(jobId, files);
+        await loadAndInit();
+        setStatus("파일을 추가했습니다. (대상은 첫 번째 파일)");
+      } catch(e){
+        console.error(e);
+        setStatus("파일 추가 실패: " + (e?.message || e));
+      }
     });
     dz.addEventListener("click", () => $("#addFilesInput").click());
     dz.addEventListener("keydown", (e) => { if (e.key==="Enter" || e.key===" ") $("#addFilesInput").click(); });
 
     $("#clearJobBtn").addEventListener("click", async () => {
-      await clearJob(jobId);
-      setStatus("이 작업(jobId)을 비웠습니다. 처음으로 돌아가 파일을 추가하세요.");
-      pagesEl.innerHTML = "";
-      selected.clear();
-      keptPages = [];
-      targetFile = null;
-      pdfDoc = null;
-      setMeta(`jobId=${jobId} | 비어있음`);
-      setSummary("");
+      try{
+        await clearJob(jobId);
+        setStatus("이 작업(jobId)을 비웠습니다. 파일을 다시 추가하세요.");
+        pagesEl.innerHTML = "";
+        selected.clear();
+        keptPages = [];
+        targetFile = null;
+        pdfDoc = null;
+        setMeta(`jobId=${jobId} | 비어있음`);
+        setSummary("");
+        updateHeaderInfo();
+      } catch(e){
+        console.error(e);
+        setStatus("오류: " + (e.message || e));
+      }
     });
 
     // init
-    loadAndInit();
+    loadAndInit().catch(e => {
+      console.error(e);
+      setStatus("오류: " + (e.message || e));
+    });
   </script>
 </body>
 </html>
